@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Fraunces } from "next/font/google";
+import { Navbar } from "@/components/layout/navbar";
+import { Footer } from "@/components/layout/footer";
 import "./globals.css";
 
 /**
@@ -61,7 +63,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
        * browser extension modifies attributes (e.g. dark-mode injectors).
        * This is the conventional Next.js pattern; it doesn't suppress real errors.
        */}
-      <body className="min-h-screen flex flex-col antialiased">{children}</body>
+      <body className="min-h-screen flex flex-col antialiased">
+        <Navbar />
+        <main className="flex-1">{children}</main>
+        <Footer />
+      </body>
     </html>
   );
 }
