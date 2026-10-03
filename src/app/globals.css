@@ -1,26 +1,146 @@
 @import "tailwindcss";
 
+/**
+ * Label Reader — Design Token System
+ * Source of truth: design implementation.md (§15, §17)
+ *
+ * Tailwind v4 uses @theme to register design tokens as CSS custom properties
+ * that Tailwind utilities can reference. All semantic values live here so
+ * components never hardcode raw hex values.
+ */
+
+/* ─── Raw tokens (values defined once) ──────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Color palette */
+  --color-background:        #FAFAF7; /* warm off-white — editorial "paper" feel */
+  --color-surface:           #FFFFFF; /* card backgrounds, sits above background */
+  --color-foreground:        #16181C; /* near-black — primary text */
+  --color-foreground-muted:  #6B6E76; /* secondary copy, timestamps, metadata */
+  --color-border:            #E9E8E3; /* hairline borders — carries structural weight */
+  --color-border-subtle:     #F0EFE9; /* even softer dividers */
+
+  /* Brand accent — deep ink-teal conveys clarity/trust (not Canopy's forest-green) */
+  --color-primary:           #1B3A4B;
+  --color-primary-foreground: #FFFFFF;
+
+  /* Semantic status colors — used for ingredient/claim communication */
+  --color-safe:              #1F8A5B; /* clean/no flags */
+  --color-safe-bg:           #1F8A5B1F;
+  --color-caution:           #B8791A; /* moderate concern (sodium, added sugar) */
+  --color-caution-bg:        #B8791A1F;
+  --color-flag:              #B4432E; /* terracotta — NOT alarm red, matches calm tone */
+  --color-flag-bg:           #B4432E1F;
+  --color-unknown:           #8A8D94; /* insufficient data */
+  --color-unknown-bg:        #8A8D941F;
+
+  /* Elevation / shadow tokens */
+  --shadow-card:    0 1px 2px rgba(16,16,16,0.04), 0 8px 24px rgba(16,16,16,0.04);
+  --shadow-elevated: 0 8px 30px rgba(16,16,16,0.12);
+
+  /* Border radius tokens */
+  --radius-card:    16px;
+  --radius-control: 10px;
+  --radius-pill:    999px;
+
+  /* Spacing tokens */
+  --space-section-y-desktop: 112px; /* 96–128px range, midpoint */
+  --space-section-y-mobile:  56px;  /* 48–64px range, midpoint */
+  --space-card-gap:          24px;
+  --space-card-padding:      24px;
+  --space-nav-height:        68px;  /* 64–72px, midpoint */
 }
 
+/* ─── Tailwind v4 theme registration ────────────────────────────────────── */
+/*
+ * @theme inline maps CSS custom properties to Tailwind utility names.
+ * bg-background → background-color: var(--color-background)
+ * text-foreground → color: var(--color-foreground)
+ * etc.
+ */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Colors */
+  --color-background:        var(--color-background);
+  --color-surface:           var(--color-surface);
+  --color-foreground:        var(--color-foreground);
+  --color-foreground-muted:  var(--color-foreground-muted);
+  --color-border:            var(--color-border);
+  --color-border-subtle:     var(--color-border-subtle);
+  --color-primary:           var(--color-primary);
+  --color-primary-foreground: var(--color-primary-foreground);
+  --color-safe:              var(--color-safe);
+  --color-safe-bg:           var(--color-safe-bg);
+  --color-caution:           var(--color-caution);
+  --color-caution-bg:        var(--color-caution-bg);
+  --color-flag:              var(--color-flag);
+  --color-flag-bg:           var(--color-flag-bg);
+  --color-unknown:           var(--color-unknown);
+  --color-unknown-bg:        var(--color-unknown-bg);
+
+  /* Typography */
+  --font-sans:         var(--font-inter);
+  --font-serif-italic: var(--font-fraunces);
+
+  /* Shadows */
+  --shadow-card:     var(--shadow-card);
+  --shadow-elevated: var(--shadow-elevated);
+
+  /* Border radius */
+  --radius-card:    var(--radius-card);
+  --radius-control: var(--radius-control);
+  --radius-pill:    var(--radius-pill);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ─── Base styles ────────────────────────────────────────────────────────── */
+html {
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-background);
+  color:            var(--color-foreground);
+  font-family:      var(--font-sans), system-ui, sans-serif;
+  font-size:        1rem;
+  line-height:      1.6;
+  -webkit-font-smoothing:  antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Typography utilities ───────────────────────────────────────────────── */
+/*
+ * Accent italic: wrap emphasized headline fragments in <span className="accent-italic">
+ * Per design spec §3: NEVER use for body copy or UI chrome — only 1–3 word
+ * fragments inside section headlines.
+ */
+.accent-italic {
+  font-family: var(--font-serif-italic), Georgia, serif;
+  font-style:  italic;
+  font-weight: 400;
+}
+
+/* ─── Motion — reduced-motion foundation ────────────────────────────────── */
+/*
+ * All animations are wrapped with this. Components only need to define
+ * their transitions; the prefers-reduced-motion override here collapses them.
+ * Per design spec §12, §14.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration:   0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration:  0.01ms !important;
+    scroll-behavior:      auto  !important;
+  }
+}
+
+/* ─── Focus styles ───────────────────────────────────────────────────────── */
+/*
+ * Visible focus ring on every interactive element.
+ * Per design spec §14: 2px, --color-primary, 2px offset.
+ */
+:focus-visible {
+  outline:        2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius:  var(--radius-control);
 }
