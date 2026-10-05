@@ -1,4 +1,4 @@
-# Label Reader
+# LabelLore
 
 > Understand what's inside your packaged food.
 
@@ -6,7 +6,7 @@
 
 ## Project
 
-Label Reader is a food label intelligence platform focused on packaged food
+LabelLore is a food label intelligence platform focused on packaged food
 products available in India. It helps consumers decode confusing ingredient
 lists, nutrition panels, and marketing claims — transparently and without
 fearmongering.
