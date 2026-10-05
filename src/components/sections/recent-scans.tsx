@@ -3,96 +3,45 @@
 import { useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, ShieldCheck, AlertTriangle } from "lucide-react";
+import { useRef, useState, useCallback } from "react";
+import { motion } from "framer-motion";
+import { ChevronLeft, ChevronRight, ShieldCheck, AlertTriangle } from "lucide-react";
 import { fadeUp, staggerContainer, viewportOnce } from "@/lib/animations";
 import { StatusPill } from "@/components/ui/status-pill";
+import Link from "next/link";
 
-/**
- * RecentScans — horizontal carousel with prev/next arrow controls.
- *
- * Design spec §4/§8: the "Recent test data" section is a horizontal-
- * scrolling carousel with arrow controls. Cards are ~280–320px fixed width.
- * scroll-snap, arrows disable at start/end.
- *
- * Desktop: 3–4 cards visible. Tablet: 2. Mobile: 1 with peek.
- */
-
-const mockScans = [
-  {
-    id: "1",
-    name: "Maggi Masala Noodles",
-    brand: "Nestlé India",
-    grade: "C",
-    score: 58,
-    status: "caution" as const,
-    statusText: "High sodium",
-    scannedAgo: "2 hours ago",
-  },
-  {
-    id: "2",
-    name: "Amul Dark Chocolate",
-    brand: "Amul",
-    grade: "B",
-    score: 74,
-    status: "safe" as const,
-    statusText: "No flagged additives",
-    scannedAgo: "5 hours ago",
-  },
-  {
-    id: "3",
-    name: "Britannia Good Day Biscuits",
-    brand: "Britannia",
-    grade: "C",
-    score: 52,
-    status: "flag" as const,
-    statusText: "Contains TBHQ",
-    scannedAgo: "1 day ago",
-  },
-  {
-    id: "4",
-    name: "Haldiram's Aloo Bhujia",
-    brand: "Haldiram's",
-    grade: "D",
-    score: 38,
-    status: "flag" as const,
-    statusText: "High saturated fat",
-    scannedAgo: "1 day ago",
-  },
-  {
-    id: "5",
-    name: "Paper Boat Aam Panna",
-    brand: "Paper Boat",
-    grade: "B",
-    score: 71,
-    status: "caution" as const,
-    statusText: "Added sugar (12g)",
-    scannedAgo: "2 days ago",
-  },
-  {
-    id: "6",
-    name: "Organic Tattva Brown Rice",
-    brand: "Organic Tattva",
-    grade: "A",
-    score: 92,
-    status: "safe" as const,
-    statusText: "No flagged additives",
-    scannedAgo: "3 days ago",
-  },
-];
+// The Scan data structure expected by the UI
+export interface RecentScanItem {
+  id: string;
+  name: string;
+  brand: string;
+  grade: "A" | "B" | "C" | "D" | "Unknown";
+  score: number;
+  status: "safe" | "caution" | "flag" | "unknown";
+  statusText: string;
+  scannedAgo: string;
+}
 
 const gradeColors: Record<string, string> = {
   A: "text-safe bg-safe-bg",
   B: "text-safe bg-safe-bg",
   C: "text-caution bg-caution-bg",
   D: "text-flag bg-flag-bg",
+  Unknown: "text-unknown bg-unknown-bg",
 };
 
 const statusIcons: Record<string, typeof ShieldCheck> = {
   safe: ShieldCheck,
   caution: AlertTriangle,
   flag: AlertTriangle,
+  unknown: ShieldCheck,
 };
 
-export function RecentScans() {
+interface RecentScansProps {
+  scans: RecentScanItem[];
+}
+
+export function RecentScans({ scans }: RecentScansProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
@@ -180,12 +129,13 @@ export function RecentScans() {
             onScroll={checkScroll}
             className="scrollbar-hide -mx-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 md:-mx-0 md:gap-5 md:px-0"
           >
-            {mockScans.map((scan) => {
+            {scans.map((scan) => {
               const Icon = statusIcons[scan.status] ?? ShieldCheck;
               return (
-                <div
+                <Link
+                  href={`/scan/${scan.id}`}
                   key={scan.id}
-                  className="w-[280px] shrink-0 snap-start rounded-2xl border border-border bg-surface p-5 shadow-[var(--shadow-card)] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-[var(--shadow-elevated)] sm:w-[300px]"
+                  className="block w-[280px] shrink-0 snap-start rounded-2xl border border-border bg-surface p-5 shadow-[var(--shadow-card)] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-[var(--shadow-elevated)] sm:w-[300px]"
                 >
                   {/* Header: grade badge + time */}
                   <div className="mb-4 flex items-center justify-between">
@@ -228,7 +178,7 @@ export function RecentScans() {
                   >
                     {scan.statusText}
                   </StatusPill>
-                </div>
+                </Link>
               );
             })}
           </div>

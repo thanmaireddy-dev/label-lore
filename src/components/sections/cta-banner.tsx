@@ -4,6 +4,7 @@ import { ArrowRight, ScanLine } from "lucide-react";
 import { motion } from "framer-motion";
 import { fadeUp, viewportOnce } from "@/lib/animations";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 /**
  * CTABanner — mid-page call-to-action.
@@ -49,9 +50,12 @@ export function CTABanner() {
                 variant="secondary"
                 className="border-primary-foreground/20 bg-primary-foreground text-primary hover:bg-primary-foreground/90"
                 size="lg"
+                asChild
               >
-                <ScanLine className="size-4" strokeWidth={1.75} />
-                Start scanning
+                <Link href="/scan">
+                  <ScanLine className="size-4" strokeWidth={1.75} />
+                  Start scanning
+                </Link>
               </Button>
               <a
                 href="#how-it-works"

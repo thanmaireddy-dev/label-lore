@@ -4,43 +4,56 @@ import { motion } from "framer-motion";
 import { ShieldCheck, AlertTriangle, Droplets, Flame } from "lucide-react";
 import { fadeUp, staggerContainer, viewportOnce } from "@/lib/animations";
 import { StatusPill } from "@/components/ui/status-pill";
+import { ProductWithDetails } from "@/features/products/product.types";
+import Link from "next/link";
 
-/**
- * FeaturedScan — hero-adjacent highlighted scan example.
- *
- * Design spec §8/§15: a larger featured card showing a scan result
- * with product name, brand, safety score, and top flag pills.
- * Demonstrates the product's core value proposition with real-looking data.
- *
- * This uses mock/demo data — real data comes in Phase 2+.
- */
-
-const mockProduct = {
-  name: "Choco-Nut Crunch Granola Bar",
-  brand: "NutriSnack India",
-  score: 62,
-  grade: "C" as const,
-  flags: [
-    { label: "High added sugar (18g)", variant: "flag" as const, icon: Droplets },
-    { label: "Contains palm oil", variant: "caution" as const, icon: AlertTriangle },
-    { label: "No artificial colours", variant: "safe" as const, icon: ShieldCheck },
-  ],
-  nutrition: [
-    { label: "Calories", value: "186 kcal" },
-    { label: "Sugar", value: "18g" },
-    { label: "Sodium", value: "140mg" },
-    { label: "Protein", value: "4g" },
-  ],
-};
+interface FeaturedScanProps {
+  product?: ProductWithDetails | null;
+}
 
 const gradeColors: Record<string, string> = {
-  A: "text-safe",
-  B: "text-safe",
-  C: "text-caution",
-  D: "text-flag",
+  A: "text-safe bg-safe-bg",
+  B: "text-safe bg-safe-bg",
+  C: "text-caution bg-caution-bg",
+  D: "text-flag bg-flag-bg",
 };
 
-export function FeaturedScan() {
+export function FeaturedScan({ product }: FeaturedScanProps) {
+  // Fallback if no product is passed
+  if (!product) return null;
+
+  // Determine a mock score and grade for Phase 2.
+  // In Phase 3, this will be replaced by the actual scoring engine.
+  const mockScore = (product.name.length * 7) % 100;
+  let grade = "C";
+  if (mockScore >= 80) grade = "A";
+  else if (mockScore >= 60) grade = "B";
+  else if (mockScore >= 40) grade = "C";
+  else grade = "D";
+
+  // Map database nutrition to UI display strip
+  const n = product.nutrition;
+  const nutritionStrip = n
+    ? [
+        { label: "Calories", value: `${n.energyKcal} kcal` },
+        { label: "Sugar", value: `${n.totalSugar || n.sugar || 0}g` },
+        { label: "Sodium", value: `${n.sodium || 0}mg` },
+        { label: "Protein", value: `${n.protein}g` },
+      ]
+    : [];
+
+  // Map database claims/ingredients to flag pills (mock logic for Phase 2)
+  const flags = [];
+  if (n && n.sugar && n.sugar > 15) {
+    flags.push({ label: `High sugar (${n.sugar}g)`, variant: "flag" as const, icon: Droplets });
+  }
+  if (product.ingredients.some(i => i.ingredient.name.toLowerCase().includes("palm"))) {
+    flags.push({ label: "Contains palm oil", variant: "caution" as const, icon: AlertTriangle });
+  }
+  if (product.claims.length > 0) {
+    flags.push({ label: product.claims[0].claim.text, variant: "safe" as const, icon: ShieldCheck });
+  }
+
   return (
     <section className="py-24 md:py-28 lg:py-32">
       <div className="mx-auto max-w-7xl px-5 md:px-8">
@@ -74,9 +87,12 @@ export function FeaturedScan() {
           whileInView="visible"
           viewport={viewportOnce}
           variants={fadeUp}
-          className="rounded-[var(--radius-card)] border border-border bg-surface shadow-[var(--shadow-card)]"
         >
-          <div className="grid gap-0 md:grid-cols-5">
+          <Link
+            href={`/scan/${product.id}`}
+            className="block rounded-[var(--radius-card)] border border-border bg-surface shadow-[var(--shadow-card)] transition-all hover:shadow-[var(--shadow-elevated)]"
+          >
+            <div className="grid gap-0 md:grid-cols-5">
             {/* Left: product image placeholder */}
             <div className="flex items-center justify-center rounded-t-[var(--radius-card)] bg-gradient-to-br from-primary/5 to-primary/10 p-10 md:col-span-2 md:rounded-t-none md:rounded-l-[var(--radius-card)]">
               <div className="space-y-3 text-center">
@@ -85,10 +101,10 @@ export function FeaturedScan() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-foreground">
-                    {mockProduct.name}
+                    {product.name}
                   </p>
                   <p className="text-xs text-foreground-muted">
-                    {mockProduct.brand}
+                    {product.brand.name}
                   </p>
                 </div>
               </div>
@@ -104,26 +120,18 @@ export function FeaturedScan() {
                   </p>
                   <div className="mt-1 flex items-baseline gap-2">
                     <span
-                      className={`text-4xl font-semibold ${gradeColors[mockProduct.grade]}`}
+                      className={`text-4xl font-semibold ${gradeColors[grade].split(" ")[0]}`}
                       style={{ letterSpacing: "-0.02em" }}
                     >
-                      {mockProduct.score}
+                      {mockScore}
                     </span>
                     <span className="text-sm text-foreground-muted">/ 100</span>
                   </div>
                 </div>
                 <span
-                  className={`inline-flex size-12 items-center justify-center rounded-xl text-xl font-bold ${gradeColors[mockProduct.grade]} bg-current/10`}
-                  style={{
-                    backgroundColor:
-                      mockProduct.grade === "C"
-                        ? "var(--color-caution-bg)"
-                        : mockProduct.grade === "D"
-                          ? "var(--color-flag-bg)"
-                          : "var(--color-safe-bg)",
-                  }}
+                  className={`inline-flex size-12 items-center justify-center rounded-xl text-xl font-bold ${gradeColors[grade]}`}
                 >
-                  {mockProduct.grade}
+                  {grade}
                 </span>
               </div>
 
@@ -131,19 +139,19 @@ export function FeaturedScan() {
               <div>
                 <div className="mb-1.5 flex justify-between text-xs text-foreground-muted">
                   <span>Ingredient Safety</span>
-                  <span>{mockProduct.score}%</span>
+                  <span>{mockScore}%</span>
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-border">
                   <div
                     className="h-full rounded-full bg-gradient-to-r from-flag via-caution to-safe transition-all duration-700"
-                    style={{ width: `${mockProduct.score}%` }}
+                    style={{ width: `${mockScore}%` }}
                   />
                 </div>
               </div>
 
               {/* Flag pills */}
               <div className="flex flex-wrap gap-2">
-                {mockProduct.flags.map((flag) => (
+                {flags.map((flag) => (
                   <StatusPill
                     key={flag.label}
                     variant={flag.variant}
@@ -156,7 +164,7 @@ export function FeaturedScan() {
 
               {/* Nutrition strip */}
               <div className="flex flex-wrap gap-4 border-t border-border pt-4">
-                {mockProduct.nutrition.map((item) => (
+                {nutritionStrip.map((item) => (
                   <div key={item.label} className="min-w-[64px]">
                     <p className="text-xs text-foreground-muted">{item.label}</p>
                     <p className="text-sm font-medium text-foreground">
@@ -166,7 +174,7 @@ export function FeaturedScan() {
                 ))}
               </div>
             </div>
-          </div>
+          </Link>
         </motion.div>
       </div>
     </section>

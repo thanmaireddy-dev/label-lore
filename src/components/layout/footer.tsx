@@ -12,17 +12,17 @@ import { siteConfig } from "@/config/site";
 const footerLinks = {
   product: [
     { href: "/scan", label: "Scan a label" },
-    { href: "/history", label: "Scan history" },
-    { href: "/insights", label: "Insights" },
+    { href: "/#recent-scans", label: "Scan history" },
+    { href: "/#", label: "Insights (Coming Soon)", disabled: true },
   ],
   resources: [
-    { href: "#how-it-works", label: "How it works" },
-    { href: "#", label: "Methodology" },
-    { href: "#", label: "FAQ" },
+    { href: "/#how-it-works", label: "How it works" },
+    { href: "/#", label: "Methodology (Coming Soon)", disabled: true },
+    { href: "/#", label: "FAQ (Coming Soon)", disabled: true },
   ],
   legal: [
-    { href: "#", label: "Privacy" },
-    { href: "#", label: "Terms" },
+    { href: "/#", label: "Privacy (Coming Soon)", disabled: true },
+    { href: "/#", label: "Terms (Coming Soon)", disabled: true },
   ],
 };
 
@@ -58,7 +58,7 @@ export function Footer() {
                 <li key={link.label}>
                   <Link
                     href={link.href}
-                    className="text-sm text-foreground-muted transition-colors hover:text-foreground"
+                    className={`text-sm transition-colors ${link.disabled ? 'text-foreground-muted/50 cursor-not-allowed' : 'text-foreground-muted hover:text-foreground'}`}
                   >
                     {link.label}
                   </Link>
@@ -77,7 +77,7 @@ export function Footer() {
                 <li key={link.label}>
                   <Link
                     href={link.href}
-                    className="text-sm text-foreground-muted transition-colors hover:text-foreground"
+                    className={`text-sm transition-colors ${link.disabled ? 'text-foreground-muted/50 cursor-not-allowed' : 'text-foreground-muted hover:text-foreground'}`}
                   >
                     {link.label}
                   </Link>
@@ -96,7 +96,7 @@ export function Footer() {
                 <li key={link.label}>
                   <Link
                     href={link.href}
-                    className="text-sm text-foreground-muted transition-colors hover:text-foreground"
+                    className={`text-sm transition-colors ${link.disabled ? 'text-foreground-muted/50 cursor-not-allowed' : 'text-foreground-muted hover:text-foreground'}`}
                   >
                     {link.label}
                   </Link>

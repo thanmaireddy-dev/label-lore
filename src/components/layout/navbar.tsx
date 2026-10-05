@@ -93,21 +93,25 @@ export function Navbar() {
 
           {/* Desktop right-side controls */}
           <div className="hidden items-center gap-2 md:flex">
-            <button
+            <Link
+              href="/scan"
               className="inline-flex size-10 items-center justify-center rounded-[var(--radius-control)] text-foreground-muted transition-colors hover:bg-foreground/5 hover:text-foreground"
               aria-label="Search"
             >
               <Search className="size-[18px]" strokeWidth={1.75} />
-            </button>
+            </Link>
             <button
-              className="inline-flex size-10 items-center justify-center rounded-[var(--radius-control)] text-foreground-muted transition-colors hover:bg-foreground/5 hover:text-foreground"
-              aria-label="Account"
+              className="inline-flex size-10 items-center justify-center rounded-[var(--radius-control)] text-foreground-muted transition-colors hover:bg-foreground/5 hover:text-foreground cursor-not-allowed opacity-50"
+              aria-label="Account (Coming Soon)"
+              title="Authentication coming soon"
             >
               <User className="size-[18px]" strokeWidth={1.75} />
             </button>
-            <Button size="default" className="ml-1">
-              <ScanLine className="size-4" strokeWidth={1.75} />
-              Scan a label
+            <Button size="default" className="ml-1" asChild>
+              <Link href="/scan">
+                <ScanLine className="size-4" strokeWidth={1.75} />
+                Scan a label
+              </Link>
             </Button>
           </div>
 
@@ -159,13 +163,15 @@ export function Navbar() {
                 ))}
               </div>
               <div className="mt-6 space-y-3 border-t border-border pt-6">
-                <Button className="w-full">
-                  <ScanLine className="size-4" strokeWidth={1.75} />
-                  Scan a label
+                <Button className="w-full" asChild>
+                  <Link href="/scan" onClick={() => setIsMobileMenuOpen(false)}>
+                    <ScanLine className="size-4" strokeWidth={1.75} />
+                    Scan a label
+                  </Link>
                 </Button>
-                <Button variant="secondary" className="w-full">
+                <Button variant="secondary" className="w-full opacity-50 cursor-not-allowed">
                   <User className="size-4" strokeWidth={1.75} />
-                  Account
+                  Account (Coming Soon)
                 </Button>
               </div>
             </div>

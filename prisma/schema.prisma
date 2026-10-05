@@ -1,0 +1,100 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Brand {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
+}
+
+model Product {
+  id          String              @id @default(cuid())
+  name        String
+  brandId     String
+  brand       Brand               @relation(fields: [brandId], references: [id])
+  category    String?
+  imageUrl    String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  ingredients ProductIngredient[]
+  nutrition   Nutrition?
+  claims      ProductClaim[]
+  scans       Scan[]
+}
+
+model Ingredient {
+  id             String              @id @default(cuid())
+  name           String
+  normalizedName String              @unique
+  category       String?
+  function       String?
+  insCode        String?
+  description    String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  products       ProductIngredient[]
+}
+
+model ProductIngredient {
+  id           String     @id @default(cuid())
+  productId    String
+  ingredientId String
+  order        Int
+  rawName      String?
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, ingredientId])
+  @@index([productId])
+  @@index([ingredientId])
+}
+
+model Nutrition {
+  id           String  @id @default(cuid())
+  productId    String  @unique
+  product      Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  energyKcal   Float
+  protein      Float
+  carbohydrate Float
+  sugar        Float?
+  addedSugar   Float?
+  fat          Float
+  saturatedFat Float?
+  transFat     Float?
+  fibre        Float?
+  sodium       Float?
+  servingSizeG Float?
+}
+
+model Claim {
+  id        String         @id @default(cuid())
+  text      String         @unique
+  category  String?
+  products  ProductClaim[]
+}
+
+model ProductClaim {
+  id        String  @id @default(cuid())
+  productId String
+  claimId   String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  claim     Claim   @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, claimId])
+}
+
+model Scan {
+  id        String   @id @default(cuid())
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  source    String   @default("manual") // manual, ocr
+  createdAt DateTime @default(now())
+}
