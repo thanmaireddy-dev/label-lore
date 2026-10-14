@@ -3,7 +3,6 @@
 import { ArrowRight, ScanLine } from "lucide-react";
 import { motion } from "framer-motion";
 import { fadeUp, viewportOnce } from "@/lib/animations";
-import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
 /**
@@ -46,17 +45,13 @@ export function CTABanner() {
               just point, scan, and learn what&apos;s inside.
             </p>
             <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-              <Button
-                variant="secondary"
-                className="border-primary-foreground/20 bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                size="lg"
-                asChild
+              <Link
+                href="/scan"
+                className="inline-flex items-center justify-center gap-2 rounded-[var(--radius-control)] h-12 px-6 text-base font-medium border border-primary-foreground/20 bg-primary-foreground text-primary transition-all duration-150 hover:bg-primary-foreground/90 active:scale-[0.98]"
               >
-                <Link href="/scan">
-                  <ScanLine className="size-4" strokeWidth={1.75} />
-                  Start scanning
-                </Link>
-              </Button>
+                <ScanLine className="size-4" strokeWidth={1.75} />
+                Start scanning
+              </Link>
               <a
                 href="#how-it-works"
                 className="group inline-flex items-center gap-1.5 text-sm font-medium text-primary-foreground/70 transition-colors hover:text-primary-foreground"

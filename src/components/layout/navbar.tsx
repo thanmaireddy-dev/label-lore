@@ -107,12 +107,13 @@ export function Navbar() {
             >
               <User className="size-[18px]" strokeWidth={1.75} />
             </button>
-            <Button size="default" className="ml-1" asChild>
-              <Link href="/scan">
-                <ScanLine className="size-4" strokeWidth={1.75} />
-                Scan a label
-              </Link>
-            </Button>
+            <Link
+              href="/scan"
+              className="ml-1 inline-flex items-center justify-center gap-2 rounded-[var(--radius-control)] h-11 px-5 text-sm font-medium bg-primary text-primary-foreground transition-all duration-150 hover:bg-primary/90 active:scale-[0.98]"
+            >
+              <ScanLine className="size-4" strokeWidth={1.75} />
+              Scan a label
+            </Link>
           </div>
 
           {/* Mobile hamburger */}
@@ -163,12 +164,14 @@ export function Navbar() {
                 ))}
               </div>
               <div className="mt-6 space-y-3 border-t border-border pt-6">
-                <Button className="w-full" asChild>
-                  <Link href="/scan" onClick={() => setIsMobileMenuOpen(false)}>
-                    <ScanLine className="size-4" strokeWidth={1.75} />
-                    Scan a label
-                  </Link>
-                </Button>
+                <Link
+                  href="/scan"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-[var(--radius-control)] h-11 px-5 text-sm font-medium bg-primary text-primary-foreground transition-all duration-150 hover:bg-primary/90 active:scale-[0.98]"
+                >
+                  <ScanLine className="size-4" strokeWidth={1.75} />
+                  Scan a label
+                </Link>
                 <Button variant="secondary" className="w-full opacity-50 cursor-not-allowed">
                   <User className="size-4" strokeWidth={1.75} />
                   Account (Coming Soon)

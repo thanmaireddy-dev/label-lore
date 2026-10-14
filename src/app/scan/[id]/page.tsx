@@ -1,20 +1,22 @@
 import { ProductService } from "@/features/products/product.service";
+import { ScanService } from "@/features/scans/scan.service";
 import { StatusPill } from "@/components/ui/status-pill";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Flame, Droplets, AlertTriangle, ShieldCheck, FileText, Beaker } from "lucide-react";
+import { Flame, AlertTriangle, ShieldCheck, FileText, Beaker } from "lucide-react";
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const product = await ProductService.getProductById(params.id);
+  const { id } = await params;
+  const product = await ProductService.getProductById(id);
   if (!product) return { title: "Product Not Found" };
-  
+
   return {
     title: `${product.name} - ${product.brand.name} | Label Reader`,
     description: `Analysis of ${product.name} by ${product.brand.name}`,
@@ -22,11 +24,25 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function ScanResultPage({ params }: PageProps) {
-  const product = await ProductService.getProductById(params.id);
+  const { id } = await params;
+
+  // Try to load as a product directly first, then fall back to loading via scan
+  let product = await ProductService.getProductById(id);
+
+  if (!product) {
+    // id might be a scan id — look up the scan's product
+    const scan = await ScanService.getScanById(id);
+    if (scan?.product) {
+      product = await ProductService.getProductById(scan.product.id);
+    }
+  }
 
   if (!product) {
     notFound();
   }
+
+  // Record a scan visit (fire-and-forget; failures don't block the page)
+  ScanService.createScan(product.id, "manual").catch(() => {});
 
   // Phase 2 mock scoring (Phase 3 will have deterministic scoring engine)
   const mockScore = (product.name.length * 7) % 100;
@@ -43,20 +59,23 @@ export default async function ScanResultPage({ params }: PageProps) {
     <div className="mx-auto max-w-5xl px-5 py-12 md:px-8 md:py-16">
       <Link href="/" className="mb-8 inline-flex items-center gap-2 text-sm text-foreground-muted hover:text-foreground">
         <ChevronLeft className="size-4" />
-        Back to search
+        Back to home
       </Link>
 
-      <div className="grid gap-12 md:grid-cols-3">
+      <div className="grid gap-8 md:grid-cols-3">
         {/* Left Column: Product Info & Score */}
         <div className="space-y-6 md:col-span-1">
           <div className="rounded-2xl bg-surface p-6 shadow-[var(--shadow-card)] border border-border">
             <div className="mb-6 flex items-center justify-center rounded-xl bg-primary/5 py-8">
               <Flame className="size-16 text-primary/40" strokeWidth={1} />
             </div>
-            
+
             <h1 className="text-2xl font-semibold text-foreground">{product.name}</h1>
-            <p className="mb-6 text-foreground-muted">{product.brand.name}</p>
-            
+            <p className="mb-1 text-foreground-muted">{product.brand.name}</p>
+            {product.category && (
+              <p className="mb-6 text-xs text-foreground-muted">{product.category}</p>
+            )}
+
             <div className="border-t border-border pt-6">
               <div className="flex items-end justify-between">
                 <div>
@@ -64,17 +83,22 @@ export default async function ScanResultPage({ params }: PageProps) {
                     Label Score
                   </p>
                   <div className="mt-1 flex items-baseline gap-2">
-                    <span className={`text-4xl font-semibold ${statusClass.split(' ')[0]}`} style={{ letterSpacing: "-0.02em" }}>
+                    <span
+                      className={`text-4xl font-semibold ${statusClass.split(" ")[0]}`}
+                      style={{ letterSpacing: "-0.02em" }}
+                    >
                       {mockScore}
                     </span>
                     <span className="text-sm text-foreground-muted">/ 100</span>
                   </div>
                 </div>
-                <span className={`inline-flex size-14 items-center justify-center rounded-xl text-2xl font-bold ${statusClass}`}>
+                <span
+                  className={`inline-flex size-14 items-center justify-center rounded-xl text-2xl font-bold ${statusClass}`}
+                >
                   {grade}
                 </span>
               </div>
-              
+
               <div className="mt-4">
                 <div className="h-2 w-full overflow-hidden rounded-full bg-border">
                   <div
@@ -83,13 +107,17 @@ export default async function ScanResultPage({ params }: PageProps) {
                   />
                 </div>
               </div>
+
+              <p className="mt-3 text-xs text-foreground-muted">
+                Deterministic scoring arrives in Phase 3.
+              </p>
             </div>
           </div>
         </div>
 
         {/* Right Column: Details */}
         <div className="space-y-8 md:col-span-2">
-          
+
           {/* Claims */}
           {product.claims.length > 0 && (
             <Card>
@@ -128,11 +156,14 @@ export default async function ScanResultPage({ params }: PageProps) {
                   <NutritionItem label="Energy" value={`${n.energyKcal} kcal`} />
                   <NutritionItem label="Protein" value={`${n.protein}g`} />
                   <NutritionItem label="Carbs" value={`${n.carbohydrate}g`} />
-                  <NutritionItem label="Total Sugar" value={`${n.sugar || 0}g`} />
-                  <NutritionItem label="Added Sugar" value={n.addedSugar !== null ? `${n.addedSugar}g` : "--"} />
+                  <NutritionItem label="Total Sugar" value={`${n.sugar ?? 0}g`} />
+                  <NutritionItem label="Added Sugar" value={n.addedSugar != null ? `${n.addedSugar}g` : "--"} />
                   <NutritionItem label="Total Fat" value={`${n.fat}g`} />
-                  <NutritionItem label="Sat. Fat" value={n.saturatedFat !== null ? `${n.saturatedFat}g` : "--"} />
-                  <NutritionItem label="Sodium" value={n.sodium !== null ? `${n.sodium}mg` : "--"} />
+                  <NutritionItem label="Sat. Fat" value={n.saturatedFat != null ? `${n.saturatedFat}g` : "--"} />
+                  <NutritionItem label="Sodium" value={n.sodium != null ? `${n.sodium}mg` : "--"} />
+                  {n.fibre != null && (
+                    <NutritionItem label="Fibre" value={`${n.fibre}g`} />
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -147,38 +178,63 @@ export default async function ScanResultPage({ params }: PageProps) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {product.ingredients.length > 0 ? (
-                  product.ingredients.map((pi) => {
+              {product.ingredients.length > 0 ? (
+                <div className="space-y-3">
+                  {product.ingredients.map((pi) => {
                     const ing = pi.ingredient;
-                    // Mock warning logic for Phase 2
-                    let variant: "safe" | "caution" | "flag" | "unknown" = "safe";
-                    if (ing.category === "Sweetener" || ing.name.includes("Palm")) variant = "caution";
-                    if (ing.name.includes("TBHQ") || ing.insCode) variant = "flag";
-                    
+                    // Mock warning logic for Phase 2 — Phase 3 will replace with rules engine
+                    let variant: "safe" | "caution" | "flag" = "safe";
+                    if (ing.category === "Sweetener") variant = "caution";
+                    if (ing.name.toLowerCase().includes("palm")) variant = "caution";
+                    if (ing.insCode) variant = "flag";
+                    if (ing.name.includes("TBHQ")) variant = "flag";
+
                     return (
-                      <div key={pi.ingredientId} className="flex flex-col gap-2 rounded-lg border border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div
+                        key={pi.ingredientId}
+                        className="flex flex-col gap-2 rounded-lg border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
+                      >
                         <div>
                           <p className="font-medium text-foreground">{ing.name}</p>
                           {(ing.function || ing.category) && (
                             <p className="text-xs text-foreground-muted">
-                              {ing.function || ing.category} {ing.insCode && `(INS ${ing.insCode})`}
+                              {ing.function || ing.category}
+                              {ing.insCode && ` (INS ${ing.insCode})`}
                             </p>
+                          )}
+                          {ing.description && (
+                            <p className="mt-1 text-xs text-foreground-muted">{ing.description}</p>
                           )}
                         </div>
                         <StatusPill variant={variant}>
-                          {variant === "flag" ? "Warning" : variant === "caution" ? "Caution" : "Safe"}
+                          {variant === "flag"
+                            ? "Check"
+                            : variant === "caution"
+                            ? "Caution"
+                            : "Safe"}
                         </StatusPill>
                       </div>
                     );
-                  })
-                ) : (
-                  <p className="text-sm text-foreground-muted">No ingredient data available.</p>
-                )}
-              </div>
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-foreground-muted">
+                  No ingredient data available for this product.
+                </p>
+              )}
             </CardContent>
           </Card>
 
+          {/* Phase 3 placeholder */}
+          <div className="rounded-xl border border-border/50 bg-surface/50 p-6 text-center">
+            <AlertTriangle className="mx-auto mb-3 size-8 text-foreground-muted/40" strokeWidth={1} />
+            <p className="text-sm font-medium text-foreground-muted">
+              Full analysis coming in Phase 3
+            </p>
+            <p className="mt-1 text-xs text-foreground-muted/60">
+              Deterministic ingredient scoring, nutrition benchmarks, and claim verification.
+            </p>
+          </div>
         </div>
       </div>
     </div>

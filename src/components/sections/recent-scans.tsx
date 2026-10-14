@@ -3,9 +3,6 @@
 import { useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, ShieldCheck, AlertTriangle } from "lucide-react";
-import { useRef, useState, useCallback } from "react";
-import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, ShieldCheck, AlertTriangle } from "lucide-react";
 import { fadeUp, staggerContainer, viewportOnce } from "@/lib/animations";
 import { StatusPill } from "@/components/ui/status-pill";
 import Link from "next/link";
@@ -64,6 +61,8 @@ export function RecentScans({ scans }: RecentScansProps) {
     // Debounced check
     setTimeout(checkScroll, 350);
   };
+
+  if (scans.length === 0) return null;
 
   return (
     <section className="bg-background py-24 md:py-28 lg:py-32">

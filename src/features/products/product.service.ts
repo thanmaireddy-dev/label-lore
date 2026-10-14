@@ -1,7 +1,5 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { ProductWithDetails, ProductSummary } from "./product.types";
-
-const prisma = new PrismaClient();
 
 export class ProductService {
   /**
@@ -25,7 +23,7 @@ export class ProductService {
   }
 
   /**
-   * Searches for products by name or brand.
+   * Searches for products by name or brand (case-insensitive where supported).
    */
   static async searchProducts(query: string): Promise<ProductSummary[]> {
     if (!query || query.trim() === "") {
@@ -39,17 +37,19 @@ export class ProductService {
         OR: [
           { name: { contains: searchTerm } },
           { brand: { name: { contains: searchTerm } } },
+          { category: { contains: searchTerm } },
         ],
       },
       include: {
         brand: true,
       },
       take: 20,
+      orderBy: { name: "asc" },
     });
   }
 
   /**
-   * Gets a list of all products for browsing.
+   * Gets a paginated list of all products for browsing.
    */
   static async getAllProducts(limit = 50): Promise<ProductSummary[]> {
     return prisma.product.findMany({
