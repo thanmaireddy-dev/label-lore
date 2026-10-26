@@ -1,159 +1,164 @@
 # Label Reader
 
-> Understand what's inside your packaged food.
+> Understand what's inside your packaged food. Label Reader decodes ingredient lists, nutrition facts, and marketing claims for Indian consumers.
 
 ---
 
-## Project
+## Project Purpose
 
-Label Reader is a food label intelligence platform focused on packaged food
-products available in India. It helps consumers decode confusing ingredient
-lists, nutrition panels, and marketing claims â€” transparently and without
-fearmongering.
-
-The goal is **food label literacy**, not a generic health-score calculator.
-Every analysis result explains *why* a product received its grade, what
-ingredients are doing, and whether front-of-pack claims hold up against the
-label data.
+Label Reader is a web application that helps Indian consumers understand food product labels. Users can search for products and view a breakdown of ingredients (including INS additive codes), nutrition facts, and front-of-pack marketing claims. The current implementation covers product and scan data management with a UI foundation; deterministic scoring, OCR, and AI explanations are planned for later phases.
 
 ---
 
-## Current Phase
+## Technology Stack
 
-**Phase 0 â€” Project Foundation**
-
-The Next.js application is initialised with TypeScript, Tailwind CSS, and the
-complete design token system. The project structure is established. No product
-features have been implemented yet.
-
----
-
-## Stack
-
-| Technology  | Role                                               |
-|-------------|----------------------------------------------------|
-| Next.js 16  | Full-stack framework â€” App Router, Route Handlers  |
-| React 19    | Component rendering                                |
-| TypeScript  | End-to-end type safety                             |
-| Tailwind v4 | Utility-first CSS, design token system             |
-| Node.js 24  | Runtime                                            |
-
-Future phases will add:
-- **PostgreSQL + Prisma** (Phase 2) â€” relational product/ingredient database
-- **Zod** (Phase 2) â€” runtime validation at API boundaries
-- **Framer Motion** (Phase 1) â€” micro-interactions and scroll animations
-- **Lucide React** (Phase 1) â€” icon set
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 16 (App Router) |
+| Language | TypeScript 5 |
+| Styling | Tailwind CSS v4 (via `@theme` tokens) |
+| Animation | Framer Motion 14 |
+| Icons | Lucide React |
+| ORM | Prisma 5.22 |
+| Database | SQLite (dev) / PostgreSQL (production) |
+| Validation | Zod |
+| Runtime | Node.js |
 
 ---
 
-## Architecture
+## Prerequisites
 
-Label Reader uses a **modular monolith** â€” one Next.js application and one
-deployment, but with clearly separated domain boundaries inside it.
+- Node.js >= 18
+- npm >= 9
 
-```
-src/app/            â† UI: pages and route handlers (thin HTTP layer)
-src/components/     â† Reusable React components (no business logic)
-src/features/       â† Domain modules: ingredients, analysis, scoring, OCR, AI
-src/lib/            â† Cross-cutting utilities: db client, env, cn(), tokens
-src/types/          â† Shared TypeScript type definitions
-src/config/         â† Site-level constants
-```
-
-Data flow:
-
-```
-UI (React)
-    â†“
-Route Handlers (src/app/api/)
-    â†“
-Feature services (src/features/<module>/*.service.ts)
-    â†“
-Data Access (Prisma â†’ PostgreSQL)
-```
-
-External services (OCR, LLM) are isolated behind feature modules in
-`src/features/ocr/` and `src/features/ai/`. The UI never calls external APIs
-directly.
-
-The scoring engine is separate from the AI explanation layer â€” the engine
-produces structured, deterministic facts; the AI only narrates those facts in
-plain language.
+No external services are required for local development -- the project uses a local SQLite file.
 
 ---
 
-## Getting Started
+## Installation
 
 ```bash
-# Install dependencies
+git clone <repo-url>
+cd label-reader
 npm install
-
-# Start the development server
-npm run dev
-
-# Type-check
-npx tsc --noEmit
-
-# Lint
-npm run lint
-
-# Production build (run before deploying)
-npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to see the Phase 0
-placeholder.
+---
 
-### Environment variables
+## Environment Setup
 
-Copy `.env.example` to `.env.local` and fill in the values:
+Copy the example and edit if needed:
 
 ```bash
 cp .env.example .env.local
 ```
 
-No environment variables are required to run the Phase 0 foundation.
+The default `.env.local` already works for local development:
+
+```env
+DATABASE_URL="file:./dev.db"
+NEXT_PUBLIC_SITE_URL="http://localhost:3000"
+NEXT_PUBLIC_APP_VERSION="0.2.0"
+```
+
+> **DATABASE_URL note**: Prisma resolves this path relative to `prisma/schema.prisma`, so `file:./dev.db` maps to `prisma/dev.db`.
 
 ---
 
-## Development Roadmap
+## Database Setup
 
-| Phase | Goal                                              | Status      |
-|-------|---------------------------------------------------|-------------|
-| 0     | Project foundation â€” Next.js, TypeScript, Tailwind| âœ… Complete  |
-| 1     | Core web application â€” landing page, UI components| ğŸ”œ Next      |
-| 2     | PostgreSQL + Prisma + product data                | ğŸ“‹ Planned  |
-| 3     | Analysis + explainable scoring engine             | ğŸ“‹ Planned  |
-| 4     | OCR â€” image â†’ normalised product data             | ğŸ“‹ Planned  |
-| 5     | AI explanation layer / chatbot                    | ğŸ“‹ Planned  |
-| 6     | Product comparison                                | ğŸ“‹ Planned  |
-| 7     | Recommendation engine                             | ğŸ“‹ Planned  |
-| 8     | User accounts, scan history, saved products       | ğŸ“‹ Planned  |
-| 9     | Multilingual support and accessibility polish     | ğŸ“‹ Planned  |
+```bash
+# 1. Generate Prisma client
+npx prisma generate
 
----
+# 2. Apply schema migrations
+npx prisma migrate deploy
 
-## Design System
+# 3. Seed with sample Indian food products
+npx prisma db seed
+```
 
-The visual design is documented in `design implementation.md`. Key decisions:
+Full reset (re-creates DB and re-seeds):
 
-- **Background:** `#FAFAF7` warm off-white â€” editorial "paper" feel
-- **Primary:** `#1B3A4B` deep ink-teal â€” clarity and trust
-- **Semantic colors:** safe `#1F8A5B`, caution `#B8791A`, flag `#B4432E`
-- **Typography:** Inter (all UI) + Fraunces Italic (1â€“3 word headline accents only)
-- **Cards:** 16px radius, 1px border, soft dual-layer shadow
-- **Tone:** calm authority â€” no fearmongering, no alarm-red, evidence-based
-
-Design tokens are defined in `src/app/globals.css` and mirrored as JS constants
-in `src/lib/tokens.ts`.
+```bash
+npx prisma migrate reset
+```
 
 ---
 
-## Design Philosophy
+## Development
 
-- Simple over clever. Explicit over abstract.
-- Business logic belongs in `src/features/`, never in React components.
-- The scoring engine is deterministic and independently testable.
-- The AI layer explains facts; it does not produce them.
-- Every ingredient warning pairs colour with a text label and icon (accessibility).
-- All animations respect `prefers-reduced-motion`.
+```bash
+npm run dev
+```
+
+Open http://localhost:3000
+
+---
+
+## Available Scripts
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Start dev server with HMR |
+| `npm run build` | Production build |
+| `npm run start` | Start production server |
+| `npm run lint` | Run ESLint |
+| `npx tsc --noEmit` | TypeScript type check |
+| `npx prisma generate` | Regenerate Prisma client |
+| `npx prisma db seed` | Seed sample data |
+| `npx prisma migrate deploy` | Apply migrations |
+| `npx prisma studio` | Visual database browser |
+
+---
+
+## Environment Variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `DATABASE_URL` | Yes | SQLite (`file:./dev.db`) or PostgreSQL URL |
+| `NEXT_PUBLIC_SITE_URL` | Yes | Public URL for metadata/OG tags |
+| `NEXT_PUBLIC_APP_VERSION` | No | Version string (display only) |
+| `OCR_API_KEY` | No (Phase 4) | OCR provider API key |
+| `AI_API_KEY` | No (Phase 5) | LLM provider API key |
+
+---
+
+## Project Structure
+
+```
+label-reader/
++-- prisma/
+¦   +-- schema.prisma       # Database schema (SQLite/PostgreSQL)
+¦   +-- migrations/         # Applied SQL migrations
+¦   +-- seed.ts             # Sample data seeder
+¦   +-- dev.db              # Local SQLite database
++-- src/
+    +-- app/                # Next.js App Router
+    ¦   +-- api/products/   # GET /api/products, /[id], /search
+    ¦   +-- api/scans/      # GET|POST /api/scans, /[id], /recent
+    ¦   +-- scan/           # Scan page and /scan/[id] result page
+    ¦   +-- layout.tsx      # Root layout (Navbar + Footer)
+    ¦   +-- page.tsx        # Home page (server component, real data)
+    +-- components/
+    ¦   +-- background/     # GradientBlobs background
+    ¦   +-- hero/           # HeroSection + ScanDropzone (search)
+    ¦   +-- layout/         # Navbar + Footer
+    ¦   +-- sections/       # FeaturedScan, RecentScans, HowItWorks, CTABanner
+    ¦   +-- ui/             # Button, Card, StatusPill primitives
+    +-- config/site.ts      # Centralised site config
+    +-- features/
+    ¦   +-- products/       # ProductService + Prisma types
+    ¦   +-- scans/          # ScanService + Prisma types
+    +-- lib/
+    ¦   +-- animations.ts   # Framer Motion presets
+    ¦   +-- env.ts          # Typed env var accessors
+    ¦   +-- prisma.ts       # PrismaClient singleton
+    ¦   +-- tokens.ts       # Design token JS re-exports
+    ¦   +-- utils.ts        # cn() utility
+    +-- types/index.ts      # Domain type definitions
+```
+
+## Seeded Sample Products
+
+Six Indian food products from Nestle, Amul, Britannia, Haldirams, Paper Boat, and Organic Tattva with full ingredient, nutrition, and claim data.

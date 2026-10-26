@@ -5,8 +5,6 @@ import Link from "next/link";
 import {
   ScanLine,
   Search,
-  Sun,
-  Moon,
   User,
   Menu,
   X,

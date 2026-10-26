@@ -2,7 +2,7 @@
 
 import { ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
-import { fadeUp, staggerContainer, viewportOnce } from "@/lib/animations";
+import { fadeUp, staggerContainer } from "@/lib/animations";
 import { GradientBlobs } from "@/components/background/gradient-blobs";
 import { ScanDropzone } from "@/components/hero/scan-dropzone";
 

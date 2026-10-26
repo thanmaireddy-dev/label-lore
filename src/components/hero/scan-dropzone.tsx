@@ -1,6 +1,6 @@
 "use client";
 
-import { Upload, Camera, Search, Loader2 } from "lucide-react";
+import { Camera, Search, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
