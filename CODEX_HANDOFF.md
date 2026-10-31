@@ -1,6 +1,6 @@
 # CODEX_HANDOFF.md — Instructions for the Next Coding Agent
 
-> **Current update (2026-10-31):** This note supersedes the legacy SQLite/PostgreSQL-prod setup and “score engine next” directions below. PostgreSQL baseline migration and legacy SQLite transfer are complete; Prisma reports up to date. The original SQLite file and matching backup are preserved. Read the “Active architecture update” at the end before acting on historical status below.
+> **Current update (2026-10-31):** This note supersedes the legacy SQLite/PostgreSQL-prod setup and “score engine next” directions below. PostgreSQL baseline and legacy SQLite transfer are complete; live barcode persistence is verified. The additive `salt` nutrition migration is applied, and the OFF ingredient/nutrition normalization tests pass. Prisma reports up to date. The original SQLite file and matching backup are preserved. Read the “Active architecture update” at the end before acting on historical status below.
 
 
 ## Read These First
@@ -148,4 +148,6 @@ OFF is the initial barcode integration. Keep its v3 response schema/client in `s
 
 For a new local setup, copy `.env.example` to `.env` and `.env.local`, set matching PostgreSQL credentials and URL, start Docker with `docker compose up -d postgres`, then run `npx prisma generate`, `npx prisma migrate deploy`, and `npm run db:migrate:legacy`. The legacy transfer script requires Node 22.5+ for built-in `node:sqlite`. `npx prisma migrate status` should report up to date. Run the idempotent seed only if additional sample data is needed.
 
-Keep OCR, deterministic grading, AI explanations, and GS1 DataKart integration deferred. Live Open Food Facts persistence/repeat lookup behavior remains a separate verification item.
+Ingredient normalization preserves OFF source text, order, repeated entries, and parenthetical qualifiers. Nutrition stores energy in kcal, macros/fiber/salt in grams, and sodium in milligrams; salt is a separate nullable `food.Nutrition.salt` field added by `20261031120000_add_salt_nutrition`. The live Nutella response verified 0.107 g salt and 42.8 mg sodium at a 100g basis, with unavailable trans fat null and verification still `UNVERIFIED`. Re-running repository persistence twice reused the same Nutella product/identifier/source record and left 7 products, 9 ingredients, 17 product-ingredient links, and 7 nutrition rows. Source provenance remains intact; the new salt field observation raised that record's observations from 23 to 24.
+
+Keep OCR, deterministic grading, AI explanations, and GS1 DataKart integration deferred.

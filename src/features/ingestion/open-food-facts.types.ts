@@ -20,6 +20,7 @@ export type NormalizedIngredient = { rawName: string; normalizedName: string; or
 export type NormalizedNutrition = {
   energyKcal: number | null; protein: number | null; carbohydrate: number | null; sugar: number | null; addedSugar: number | null;
   fat: number | null; saturatedFat: number | null; transFat: number | null; fibre: number | null;
+  salt: number | null;
   sodium: number | null; servingSizeG: number | null;
 };
 export type NormalizedFoodProduct = {

@@ -140,6 +140,7 @@ model Nutrition {
   saturatedFat   Float?
   transFat       Float?
   fibre          Float?
+  salt           Float?
   sodium         Float?
   servingSizeG   Float?
   nutritionBasis String?             @default("100g")

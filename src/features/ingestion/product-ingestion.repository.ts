@@ -113,7 +113,9 @@ export class ProductIngestionRepository {
 
         const existingSourceIngredients = await tx.productIngredient.count({ where: { sourceRecordId: sourceRecord.id } });
         const existingAnyIngredients = await tx.productIngredient.count({ where: { productId: product.id } });
-        if (existingSourceIngredients) await tx.productIngredient.deleteMany({ where: { sourceRecordId: sourceRecord.id } });
+        if (normalized.ingredients.length && existingSourceIngredients) {
+          await tx.productIngredient.deleteMany({ where: { sourceRecordId: sourceRecord.id } });
+        }
         if (normalized.ingredients.length && (existingSourceIngredients > 0 || existingAnyIngredients === 0)) {
           for (const item of normalized.ingredients) {
             const ingredient = await tx.ingredient.upsert({
@@ -144,7 +146,7 @@ export class ProductIngestionRepository {
             nutritionBasis: normalized.nutritionBasis,
             verification: "UNVERIFIED" as const,
           };
-          const nutrientFields = ["energyKcal", "protein", "carbohydrate", "sugar", "addedSugar", "fat", "saturatedFat", "transFat", "fibre", "sodium", "servingSizeG"] as const;
+          const nutrientFields = ["energyKcal", "protein", "carbohydrate", "sugar", "addedSugar", "fat", "saturatedFat", "transFat", "fibre", "salt", "sodium", "servingSizeG"] as const;
           const existing = await tx.nutrition.findUnique({ where: { productId: product.id } });
           if (!existing) {
             await tx.nutrition.create({ data });
@@ -202,7 +204,7 @@ export class ProductIngestionRepository {
           ...(ingredientCount === 0 ? ["ingredients"] : []),
           ...(!product.allergensText && allergenCount === 0 ? ["allergens"] : []),
           ...(!canonicalNutrition ? ["nutrition"] : [
-            ...(["energyKcal", "protein", "carbohydrate", "sugar", "addedSugar", "fat", "saturatedFat", "transFat", "fibre", "sodium"] as const)
+            ...(["energyKcal", "protein", "carbohydrate", "sugar", "addedSugar", "fat", "saturatedFat", "transFat", "fibre", "salt", "sodium"] as const)
               .filter((field) => canonicalNutrition[field] === null).map((field) => `nutrition.${field}`),
             ...(!canonicalNutrition.nutritionBasis ? ["nutritionBasis"] : []),
           ]),

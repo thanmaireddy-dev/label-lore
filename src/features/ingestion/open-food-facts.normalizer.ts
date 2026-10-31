@@ -6,12 +6,65 @@ function toFiniteNumber(value: unknown): number | null {
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
-function pickNutrient(n: Record<string, unknown> | undefined, ...keys: string[]): number | null {
+function basisSuffixes(product: OpenFoodFactsProduct): string[] {
+  const basis = product.nutrition_data_per?.toLocaleLowerCase("en-US") ?? "";
+  return basis.includes("100ml") ? ["_100ml", "_100g"] : ["_100g", "_100ml"];
+}
+function pickNutrient(n: Record<string, unknown> | undefined, product: OpenFoodFactsProduct, ...keys: string[]): number | null {
   if (!n) return null;
-  for (const key of keys) { const value = toFiniteNumber(n[key]); if (value !== null) return value; }
+  for (const suffix of basisSuffixes(product)) {
+    for (const key of keys) {
+      const value = toFiniteNumber(n[`${key}${suffix}`]);
+      if (value !== null) return value;
+    }
+  }
+  for (const key of keys) {
+    const value = toFiniteNumber(n[`${key}_value`] ?? n[key]);
+    if (value !== null) return value;
+  }
   return null;
 }
-function normalizedName(value: string): string { return value.normalize("NFKC").trim().toLocaleLowerCase("en-US").replace(/\s+/g, " "); }
+function pickSodiumMg(n: Record<string, unknown> | undefined, product: OpenFoodFactsProduct): number | null {
+  if (!n) return null;
+  for (const suffix of basisSuffixes(product)) {
+    const milligrams = toFiniteNumber(n[`sodium_mg${suffix}`]);
+    if (milligrams !== null) return milligrams;
+  }
+  const sodium = pickNutrient(n, product, "sodium");
+  if (sodium === null) return toFiniteNumber(n.sodium_mg_value);
+  const unit = typeof n.sodium_unit === "string" ? n.sodium_unit.trim().toLocaleLowerCase("en-US") : "g";
+  if (["mg", "milligram", "milligrams"].includes(unit)) return sodium;
+  if (["g", "gram", "grams"].includes(unit)) return sodium * 1000;
+  return null;
+}
+function pickSaltG(n: Record<string, unknown> | undefined, product: OpenFoodFactsProduct): number | null {
+  if (!n) return null;
+  const unit = typeof n.salt_unit === "string" ? n.salt_unit.trim().toLocaleLowerCase("en-US") : "g";
+  for (const suffix of basisSuffixes(product)) {
+    const grams = toFiniteNumber(n[`salt${suffix}`]);
+    if (grams !== null) {
+      if (["g", "gram", "grams"].includes(unit)) return grams;
+      if (["mg", "milligram", "milligrams"].includes(unit)) return grams / 1000;
+      return null;
+    }
+    const milligrams = toFiniteNumber(n[`salt_mg${suffix}`]);
+    if (milligrams !== null) return milligrams / 1000;
+  }
+  const saltValue = toFiniteNumber(n.salt_value ?? n.salt);
+  if (saltValue !== null) {
+    if (["g", "gram", "grams"].includes(unit)) return saltValue;
+    if (["mg", "milligram", "milligrams"].includes(unit)) return saltValue / 1000;
+    return null;
+  }
+  const milligrams = toFiniteNumber(n.salt_mg_value);
+  return milligrams === null ? null : milligrams / 1000;
+}
+function normalizedName(value: string): string {
+  return value.normalize("NFKC").toLocaleLowerCase("en-US")
+    .replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[‐‑‒–—]/g, "-")
+    .trim().replace(/\s+([,.;:!?])/g, "$1").replace(/([([{])\s+/g, "$1")
+    .replace(/\s+([)\]}])/g, "$1").replace(/[.,;:!?]+$/g, "").replace(/\s+/g, " ");
+}
 function extractIngredientText(item: unknown): string[] {
   if (typeof item === "string") return [item];
   if (!item || typeof item !== "object") return [];
@@ -40,18 +93,20 @@ function parseQuantityInGrams(value: string | null | undefined): number | null {
 function normalizeIngredients(product: OpenFoodFactsProduct, label: string | null): NormalizedIngredient[] {
   const structured = product.ingredients?.flatMap(extractIngredientText).map((v) => v.trim()).filter(Boolean) ?? [];
   const items = structured.length ? structured : label ? splitIngredientText(label) : [];
-  return items.map((rawName, index) => ({ rawName, normalizedName: normalizedName(rawName.replace(/\s*\([^)]*\)\s*$/, "")), order: index, insCode: extractInsCode(rawName) })).filter((item) => item.normalizedName.length > 0);
+  return items.map((rawName, index) => ({ rawName, normalizedName: normalizedName(rawName), order: index, insCode: extractInsCode(rawName) })).filter((item) => item.normalizedName.length > 0);
 }
 function normalizeNutrition(product: OpenFoodFactsProduct): NormalizedNutrition | null {
   const n = product.nutriments as Record<string, unknown> | undefined; if (!n) return null;
-  const sodiumGrams = pickNutrient(n, "sodium_100g", "sodium_value");
+  const energyInKj = pickNutrient(n, product, "energy-kj");
+  const energyKcal = pickNutrient(n, product, "energy-kcal") ?? (energyInKj === null ? null : energyInKj / 4.184);
   const result: NormalizedNutrition = {
-    energyKcal: pickNutrient(n, "energy-kcal_100g", "energy-kcal_value", "energy-kcal") ?? ((pickNutrient(n, "energy-kj_100g") ?? 0) / 4.184 || null),
-    protein: pickNutrient(n, "proteins_100g", "proteins_value"), carbohydrate: pickNutrient(n, "carbohydrates_100g", "carbohydrates_value"),
-    sugar: pickNutrient(n, "sugars_100g", "sugars_value"), addedSugar: pickNutrient(n, "added-sugars_100g", "added-sugars_value"), fat: pickNutrient(n, "fat_100g", "fat_value"),
-    saturatedFat: pickNutrient(n, "saturated-fat_100g", "saturated-fat_value"), transFat: pickNutrient(n, "trans-fat_100g", "trans-fat_value"),
-    fibre: pickNutrient(n, "fiber_100g", "fiber_value", "fibre_100g"),
-    sodium: sodiumGrams === null ? pickNutrient(n, "sodium_mg_100g") : sodiumGrams * 1000,
+    energyKcal,
+    protein: pickNutrient(n, product, "proteins"), carbohydrate: pickNutrient(n, product, "carbohydrates"),
+    sugar: pickNutrient(n, product, "sugars"), addedSugar: pickNutrient(n, product, "added-sugars"), fat: pickNutrient(n, product, "fat"),
+    saturatedFat: pickNutrient(n, product, "saturated-fat"), transFat: pickNutrient(n, product, "trans-fat"),
+    fibre: pickNutrient(n, product, "fiber", "fibre"),
+    salt: pickSaltG(n, product),
+    sodium: pickSodiumMg(n, product),
     servingSizeG: parseQuantityInGrams(product.serving_size),
   };
   return Object.entries(result).some(([key, value]) => key !== "servingSizeG" && value !== null) ? result : null;

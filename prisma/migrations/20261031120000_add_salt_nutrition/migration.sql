@@ -1,0 +1,1 @@
+ALTER TABLE "food"."Nutrition" ADD COLUMN "salt" DOUBLE PRECISION;

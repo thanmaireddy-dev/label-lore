@@ -27,6 +27,15 @@ _Last updated: 2026-10-31 | Phase: PostgreSQL and ingestion foundation in progre
 - HTTP results: malformed barcode `123` returned 400; syntactically valid but absent barcode `0000000000000` returned 404; the live barcode and internal ID routes returned 200. Client tests cover incomplete nullable payloads, unavailable responses, upstream HTTP failures, and malformed JSON.
 - No SQLite files were changed. The persisted category label is the source's `fr:Nuttela` category string; OFF category labels are source-provided and remain unverified.
 
+## Ingredient and nutrition normalization (2026-10-31)
+
+- Ingredient normalization uses OFF structured ingredients when present, otherwise splits the source ingredient text on top-level commas/semicolons. It preserves the source label text, order, repeated entries, and parenthetical qualifiers. Matching names normalize Unicode compatibility forms, case, whitespace, and common punctuation spacing; no ingredients are inferred. Missing/empty lists produce no ingredient rows and remain recorded as missing in source observations.
+- Nutrition normalization prefers the basis declared by OFF (`100g` or `100ml`), with a fallback to the other standardized basis, then raw values. Energy is stored in kcal (kJ converted by 4.184); macros, salt, and fiber are stored in grams; sodium is stored in milligrams. Salt and sodium remain separate and are never inferred from each other. Invalid or unsupported values remain null. Raw OFF payload and basis are retained, and imported nutrition remains `UNVERIFIED`.
+- Added nullable `food.Nutrition.salt` through additive migration `20261031120000_add_salt_nutrition`. Existing product and nutrition rows were preserved; no existing source record or observation was deleted. The migration is applied and Prisma status is up to date.
+- Live OFF Nutella re-ingestion preserved product ID `cmvwfekaz0005bdcov9v3ufsl`, its single GTIN and source record, and its two ordered ingredients (`sugar`, `palm oil`). Nutrition now stores 539 kcal, 6.3 g protein, 57.5 g carbohydrate, 56.3 g sugar, 30.9 g fat, 10.6 g saturated fat, 0 g fiber, 0.107 g salt, and 42.8 mg sodium; unavailable trans fat remains null. Basis is `100g`; verification remains `UNVERIFIED`.
+- The live repository persistence method was run twice with the same fetched OFF payload. Product count stayed 7, ingredient count 9, product-ingredient relationship count 17, and nutrition count 7. The GTIN/source record remained unique; observations increased from 23 to 24 because the new explicit `nutrition.salt` observation was added.
+- Focused tests cover structured/text extraction, order, repeats, punctuation/case/whitespace normalization, per-100ml preference, kJ and sodium/salt unit conversions, invalid/null values, and repeated lookup cache behavior. Fourteen ingestion tests pass.
+
 ---
 
 ## 1. Project Overview & Implementation Status
@@ -333,4 +342,4 @@ The baseline migration `prisma/migrations/20261031090000_postgresql_foundation/m
 
 Counts reconcile with SQLite: Brand 6, Product 6, Ingredient 9, ProductIngredient 15, Nutrition 6, Claim 4, ProductClaim 4, Scan 6; PostgreSQL additionally has 6 mapped categories and 2 mapped additives. PostgreSQL has 22 validated foreign keys and zero imported relationship orphans. `npx prisma migrate status` reports up to date. The original SQLite source and backup still share SHA-256 `B7E9B8CE8A99C7EB5D48AB7249EA2D69E153F5BE4F299B4E9908901078D6CEB6`.
 
-Checks run in this phase: baseline migration deploy, SQLite migration script twice, Prisma validation and migration status, source/backup hash comparison, SQLite foreign-key check, PostgreSQL table/count/constraint queries, TypeScript, lint, and existing OFF unit tests. PostgreSQL setup and legacy transfer are complete. Barcode persistence/repeat lookup and internal product API checks against PostgreSQL remain separate verification items. Do not proceed to OCR, grading, or AI in this phase.
+Checks run in this phase include the additive salt migration, live OFF Nutella persistence twice, PostgreSQL record and relationship checks, Prisma validation/status, 14 ingestion tests, TypeScript, lint, production build, and `git diff --check`. The baseline and legacy transfer are complete; barcode persistence and internal API retrieval have also been verified. Keep OCR, grading, and AI deferred.
