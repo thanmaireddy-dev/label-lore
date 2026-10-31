@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test src/features/ingestion/*.test.ts"
+    "test": "tsx --test src/features/ingestion/*.test.ts",
+    "db:migrate:legacy": "node --env-file=.env prisma/migrate-legacy-sqlite.mjs"
   },
   "dependencies": {
     "@prisma/client": "5.22.0",

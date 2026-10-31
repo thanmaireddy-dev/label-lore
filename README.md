@@ -28,9 +28,11 @@ Label Reader is a web application that helps Indian consumers understand food pr
 
 ## Prerequisites
 
-- Node.js >= 18
+- Node.js >= 20.9 for Next.js
 - npm >= 9
 - Docker Desktop with Docker Compose (for local PostgreSQL)
+
+The one-time SQLite transfer script uses Node's built-in `node:sqlite` and requires Node.js >= 22.5.
 
 A PostgreSQL database is required for the current Prisma schema. The previous local SQLite database is retained at `prisma/dev.db`; its data is not automatically transferred.
 
@@ -65,20 +67,24 @@ Start PostgreSQL with persistent Docker volume storage:
 docker compose up -d postgres
 ```
 
-Apply the PostgreSQL baseline, seed the sample products, and start the app:
+Apply the PostgreSQL baseline and transfer the preserved demo database before starting the app:
 
 ```bash
 npx prisma generate
 npx prisma migrate deploy
-npx prisma db seed
+# If the legacy SQLite database and its backup are present:
+npm run db:migrate:legacy
+npx prisma migrate status
 npm run dev
 ```
+
+On a clean checkout without the local legacy SQLite file and backup, use `npx prisma db seed` instead of the transfer command to load the six sample products.
 
 Check database readiness with `docker compose ps`. Use `docker compose down` to stop the container; the named volume remains. `docker compose down -v` deletes the local PostgreSQL data volume and should only be used when you intentionally want to remove this database.
 
 ---
 
-The existing SQLite database contains demonstration records. Before any transfer, it was backed up to `prisma/backups/dev-pre-postgresql-20261031.db` (the backup is ignored by Git). It remains unchanged. PostgreSQL migration and SQLite transfer have not yet been run; follow the latest `PROJECT_STATUS.md` before treating the PostgreSQL setup as complete. The seed command is safe to rerun and does not transfer SQLite records.
+The SQLite transfer script verifies the backup hash, reads `prisma/dev.db` read-only, preserves existing IDs and relationships, and uses non-overwriting upserts so it can be rerun. It maps old category text into `food.Category` and old ingredient INS codes into `food.Additive`. It requires Node 22.5+ for built-in `node:sqlite`. The original database and ignored backup remain unchanged. The current migration and transfer results are documented in `PROJECT_STATUS.md`.
 
 ---
 
@@ -101,6 +107,7 @@ Open http://localhost:3000
 | `npm run start` | Start production server |
 | `npm run lint` | Run ESLint |
 | `npm run test` | Run Open Food Facts client and normalizer tests |
+| `npm run db:migrate:legacy` | Safely transfer rows from the preserved SQLite database |
 | `npx tsc --noEmit` | TypeScript type check |
 | `npx prisma generate` | Regenerate Prisma client |
 | `npx prisma db seed` | Seed sample data |
@@ -165,7 +172,7 @@ Six Indian food products from Nestle, Amul, Britannia, Haldirams, Paper Boat, an
 
 The active Prisma schema now targets one PostgreSQL database with two namespaces: `food` contains canonical brands, products, identifiers, ingredients, nutrition, additives, categories, allergens, and source provenance; `app` contains users and user/anonymous-session search and scan history. The SQLite database and its original migration are preserved in `prisma/dev.db` and `prisma/legacy-sqlite-migrations/`. Existing SQLite rows have **not** been transferred or deleted.
 
-The initial PostgreSQL baseline migration is `prisma/migrations/20261031090000_postgresql_foundation/migration.sql`. Apply it only after configuring `DATABASE_URL` to the intended PostgreSQL database with `npx prisma migrate deploy`. This baseline is for a new PostgreSQL schema; it does not import data from SQLite. The local `.env.local` is intentionally left untouched. Configure it with a PostgreSQL URL before running the current app.
+The PostgreSQL baseline migration is `prisma/migrations/20261031090000_postgresql_foundation/migration.sql`; it creates the `app` and `food` schemas and their tables, but does not import SQLite data. The legacy transfer is handled separately by `npm run db:migrate:legacy` after the baseline is applied.
 
 The repeatable seed inserts the six demonstration products only when absent. It no longer clears tables or creates synthetic scan-history entries.
 
@@ -177,4 +184,4 @@ Each lookup preserves the source product response, source URL, external ID, retr
 
 For regulatory work, use current FSSAI regulations and amendments as separately maintained evidence. FSSAI is not treated as a branded product catalog. GS1 India DataKart remains deferred pending commercial access and redistribution terms. USDA FoodData Central and ICMR-NIN IFCT remain supplementary nutrient references, not authoritative Indian packaged-label records.
 
-The SQLite-to-PostgreSQL data transfer, live migration application, PostgreSQL connection check, and seed execution remain pending because no PostgreSQL URL is configured. Configure one and take a database backup before running any data-transfer procedure. OCR, scoring, and AI explanation remain out of scope.
+The baseline and SQLite transfer have been applied and verified in the configured local PostgreSQL database. Prisma reports migration status up to date. SQLite row counts reconcile with PostgreSQL; the original source and verified backup are unchanged. OCR, scoring, and AI explanation remain out of scope.
