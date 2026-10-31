@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { normalizeOpenFoodFactsProduct } from "./open-food-facts.normalizer";
 import { OpenFoodFactsClient } from "./open-food-facts.client";
-import { OpenFoodFactsUnavailableError } from "./open-food-facts.types";
+import { OpenFoodFactsRequestError, OpenFoodFactsUnavailableError } from "./open-food-facts.types";
 
 test("normalizes an OFF barcode product without losing incomplete fields", () => {
   const product = normalizeOpenFoodFactsProduct({
@@ -38,6 +38,19 @@ test("normalizes a partial product while keeping unavailable facts explicit", ()
   assert.deepEqual(product.missingFields, ["brand", "category", "ingredients", "nutrition", "allergens"]);
 });
 
+test("accepts nullable OFF fields and rejects a product with no usable name", async () => {
+  const client = new OpenFoodFactsClient(async () => Response.json({
+    status: "success",
+    product: { code: "8901234567890", product_name: null, product_name_en: null, brands: null, nutriments: null },
+  }));
+  const product = await client.getProductByBarcode("8901234567890");
+  assert.equal(product.product_name, null);
+  assert.throws(
+    () => normalizeOpenFoodFactsProduct({ code: "8901234567890", product_name: null, product_name_en: null }, "8901234567890"),
+    /missing its product name/,
+  );
+});
+
 test("Open Food Facts client sends an identifying User-Agent", async () => {
   let seenAgent = "";
   const client = new OpenFoodFactsClient(async (_input, init) => {
@@ -65,4 +78,14 @@ test("Open Food Facts client treats a string failure status as unavailable", asy
 test("Open Food Facts client treats status zero as unavailable", async () => {
   const client = new OpenFoodFactsClient(async () => Response.json({ status: 0, status_verbose: "product not found" }));
   await assert.rejects(client.getProductByBarcode("8901234567890"), OpenFoodFactsUnavailableError);
+});
+
+test("Open Food Facts client reports upstream HTTP and malformed JSON errors", async () => {
+  const failedRequest = new OpenFoodFactsClient(async () => new Response("upstream error", { status: 503 }));
+  await assert.rejects(failedRequest.getProductByBarcode("8901234567890"), (error: unknown) =>
+    error instanceof OpenFoodFactsRequestError && error.status === 503,
+  );
+
+  const malformedResponse = new OpenFoodFactsClient(async () => new Response("not json", { status: 200 }));
+  await assert.rejects(malformedResponse.getProductByBarcode("8901234567890"), OpenFoodFactsRequestError);
 });

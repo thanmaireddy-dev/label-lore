@@ -28,7 +28,7 @@ export class OpenFoodFactsClient {
     const unsuccessful = typeof parsed.data.status === "number"
       ? parsed.data.status !== 1
       : parsed.data.status !== "success";
-    if (unsuccessful || !parsed.data.product) throw new OpenFoodFactsUnavailableError(parsed.data.status_verbose);
+    if (unsuccessful || !parsed.data.product) throw new OpenFoodFactsUnavailableError(parsed.data.status_verbose ?? undefined);
     return parsed.data.product;
   }
 }

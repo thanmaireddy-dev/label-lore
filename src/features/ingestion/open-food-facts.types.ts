@@ -1,20 +1,20 @@
 import { z } from "zod";
 
-const NutrimentsSchema = z.record(z.string(), z.union([z.number(), z.string(), z.null()])).optional();
+const NutrimentsSchema = z.record(z.string(), z.union([z.number(), z.string(), z.null()])).nullish();
 const IngredientNodeSchema: z.ZodType<unknown> = z.lazy(() => z.union([
   z.string(),
-  z.object({ text: z.string().optional(), id: z.string().optional(), ingredients: z.array(IngredientNodeSchema).optional() }).passthrough(),
+  z.object({ text: z.string().nullish(), id: z.string().nullish(), ingredients: z.array(IngredientNodeSchema).nullish() }).passthrough(),
 ]));
 
 export const OpenFoodFactsProductSchema = z.object({
-  code: z.string().optional(), product_name: z.string().optional(), product_name_en: z.string().optional(),
-  brands: z.string().optional(), categories: z.string().optional(), image_url: z.string().url().optional().or(z.literal("")),
-  quantity: z.string().optional(), serving_size: z.string().optional(), ingredients_text: z.string().optional(), ingredients: z.array(IngredientNodeSchema).optional(),
-  allergens: z.string().optional(), allergens_tags: z.array(z.string()).optional(), additives_tags: z.array(z.string()).optional(),
-  nutriments: NutrimentsSchema, nutrition_data_per: z.string().optional(), last_modified_t: z.number().int().nonnegative().optional(),
+  code: z.string().nullish(), product_name: z.string().nullish(), product_name_en: z.string().nullish(),
+  brands: z.string().nullish(), categories: z.string().nullish(), image_url: z.string().url().nullish().or(z.literal("")),
+  quantity: z.string().nullish(), serving_size: z.string().nullish(), ingredients_text: z.string().nullish(), ingredients: z.array(IngredientNodeSchema).nullish(),
+  allergens: z.string().nullish(), allergens_tags: z.array(z.string()).nullish(), additives_tags: z.array(z.string()).nullish(),
+  nutriments: NutrimentsSchema, nutrition_data_per: z.string().nullish(), last_modified_t: z.number().int().nonnegative().nullish(),
 }).passthrough();
 
-export const OpenFoodFactsResponseSchema = z.object({ status: z.union([z.number(), z.string()]), status_verbose: z.string().optional(), product: OpenFoodFactsProductSchema.optional() }).passthrough();
+export const OpenFoodFactsResponseSchema = z.object({ status: z.union([z.number(), z.string()]), status_verbose: z.string().nullish(), product: OpenFoodFactsProductSchema.nullish() }).passthrough();
 export type OpenFoodFactsProduct = z.infer<typeof OpenFoodFactsProductSchema>;
 export type NormalizedIngredient = { rawName: string; normalizedName: string; order: number; insCode: string | null };
 export type NormalizedNutrition = {

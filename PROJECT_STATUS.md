@@ -1,6 +1,6 @@
 # PROJECT_STATUS.md — Label Reader Handoff Report
 
-> **Current update (2026-10-31):** The PostgreSQL baseline is applied and the six legacy SQLite products and related rows are transferred. Both schemas and all expected tables exist, PostgreSQL foreign keys validate, and `prisma migrate status` reports the database up to date. The original SQLite database and matching backup remain unchanged. See the Phase 2B update below for counts and limitations.
+> **Current update (2026-10-31):** The PostgreSQL baseline and six-row legacy SQLite transfer are verified. The live barcode flow also persisted Nutella (3017620422003), returned the same internal ID on repeat lookup, and retrieved it by ID. Invalid and missing barcode responses were verified. See the Phase 2B update and barcode workflow section for counts and checks.
 
 
 _Last updated: 2026-10-31 | Phase: PostgreSQL and ingestion foundation in progress_
@@ -17,7 +17,15 @@ _Last updated: 2026-10-31 | Phase: PostgreSQL and ingestion foundation in progre
 - PostgreSQL contains all 15 `food` model tables and all 3 `app` model tables, plus `app._prisma_migrations`. All legacy IDs were checked; imported relationship checks found zero orphans. PostgreSQL has 22 foreign-key constraints, all validated. SQLite `PRAGMA foreign_key_check` is clean.
 - Legacy SQLite has no barcode identifiers, source records, field observations, source attribution, users, or search events. Those PostgreSQL tables remain empty for these imported rows. `Scan.source` was copied; legacy nutritional basis was not recorded, so imported nutrition uses `nutritionBasis = null` and remains `UNVERIFIED`. The original SQLite file and backup still have the same SHA-256.
 - The live Open Food Facts endpoint returned Nutella for barcode `3017620422003`; the existing client and normalizer now handle the current string `status: "success"` envelope. The normalized result included name/brand, two ingredients, 539 kcal, 56.3 g sugar, 42.8 mg sodium, and `100g` basis; absent trans fat remained null and was listed in `missingFields`. Regression tests cover string success/failure statuses.
-- Live Open Food Facts persistence and repeat barcode lookup behavior remain unverified in this migration task. The legacy migration script does not modify ingestion code.
+- Live barcode lookup and persistence are verified: Nutella was stored with one GTIN identifier, one Open Food Facts source record, 23 field observations, two ingredient rows, and nutrition. Repeated lookup returned the same product ID and did not add duplicates. The original six SQLite products remain intact. See the later barcode workflow update for endpoint and check results.
+
+## Barcode lookup verification (2026-10-31)
+
+- `GET /api/products/by-barcode/3017620422003` made a live Open Food Facts v3 lookup and persisted Nutella as internal product `cmvwfekaz0005bdcov9v3ufsl`. The response included two ingredients and the available nutrition facts; absent trans fat remains null and listed as missing.
+- `GET /api/products/{id}` returned that persisted PostgreSQL product. Repeating the barcode GET returned the same ID. Before the live lookup, PostgreSQL had 6 products and no barcode/source records; afterward it had 7 products, 1 identifier, 1 source, 1 source record, 23 field observations, 17 product-ingredient rows, and 7 nutrition rows. Ingredient count stayed 9; the additional two product-ingredient relationships belong to Nutella.
+- The source record preserves `open_food_facts`, the barcode as external ID, the OFF product URL, retrieval time `2026-10-31 13:17:33.915`, and source modification time `2026-10-28 13:47:08`. Read-only relationship checks found zero orphan identifiers, source records, observations, or product-ingredient rows.
+- HTTP results: malformed barcode `123` returned 400; syntactically valid but absent barcode `0000000000000` returned 404; the live barcode and internal ID routes returned 200. Client tests cover incomplete nullable payloads, unavailable responses, upstream HTTP failures, and malformed JSON.
+- No SQLite files were changed. The persisted category label is the source's `fr:Nuttela` category string; OFF category labels are source-provided and remain unverified.
 
 ---
 

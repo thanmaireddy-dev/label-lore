@@ -33,7 +33,7 @@ function extractInsCode(value: string): string | null {
   const match = value.match(/\b(?:INS\s*)?(\d{3,4}[a-z]?)\b/i) ?? value.match(/\be(\d{3,4}[a-z]?)\b/i);
   return match?.[1]?.toUpperCase() ?? null;
 }
-function parseQuantityInGrams(value: string | undefined): number | null {
+function parseQuantityInGrams(value: string | null | undefined): number | null {
   if (!value) return null; const match = value.match(/(\d+(?:[.,]\d+)?)\s*(?:g|gram|grams)\b/i);
   return match ? toFiniteNumber(match[1].replace(",", ".")) : null;
 }
