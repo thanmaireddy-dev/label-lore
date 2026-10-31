@@ -129,7 +129,7 @@ export function ScanDropzone({ className }: ScanDropzoneProps) {
                         {product.name}
                       </span>
                       <span className="text-xs text-foreground-muted">
-                        {product.brand.name}
+                        {product.brand?.name ?? "Unknown brand"}
                       </span>
                     </Link>
                   </li>

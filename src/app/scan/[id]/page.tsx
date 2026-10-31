@@ -18,8 +18,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!product) return { title: "Product Not Found" };
 
   return {
-    title: `${product.name} - ${product.brand.name} | Label Reader`,
-    description: `Analysis of ${product.name} by ${product.brand.name}`,
+    title: `${product.name} - ${product.brand?.name ?? "Unknown brand"} | Label Reader`,
+    description: `Analysis of ${product.name} by ${product.brand?.name ?? "Unknown brand"}`,
   };
 }
 
@@ -71,9 +71,9 @@ export default async function ScanResultPage({ params }: PageProps) {
             </div>
 
             <h1 className="text-2xl font-semibold text-foreground">{product.name}</h1>
-            <p className="mb-1 text-foreground-muted">{product.brand.name}</p>
-            {product.category && (
-              <p className="mb-6 text-xs text-foreground-muted">{product.category}</p>
+            <p className="mb-1 text-foreground-muted">{product.brand?.name ?? "Unknown brand"}</p>
+            {product.category?.name && (
+              <p className="mb-6 text-xs text-foreground-muted">{product.category.name}</p>
             )}
 
             <div className="border-t border-border pt-6">
@@ -147,18 +147,18 @@ export default async function ScanResultPage({ params }: PageProps) {
                   <FileText className="size-5 text-primary" />
                   Nutrition Facts
                   <span className="ml-auto text-xs font-normal text-foreground-muted">
-                    {n.servingSizeG ? `Per ${n.servingSizeG}g serving` : "Per 100g"}
+                    {n.nutritionBasis ? `Per ${n.nutritionBasis}` : "Source basis unspecified"}{n.servingSizeG ? ` · Serving ${n.servingSizeG}g` : ""}
                   </span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                  <NutritionItem label="Energy" value={`${n.energyKcal} kcal`} />
-                  <NutritionItem label="Protein" value={`${n.protein}g`} />
-                  <NutritionItem label="Carbs" value={`${n.carbohydrate}g`} />
-                  <NutritionItem label="Total Sugar" value={`${n.sugar ?? 0}g`} />
+                  <NutritionItem label="Energy" value={`${n.energyKcal ?? "--"} kcal`} />
+                  <NutritionItem label="Protein" value={`${n.protein ?? "--"}g`} />
+                  <NutritionItem label="Carbs" value={`${n.carbohydrate ?? "--"}g`} />
+                  <NutritionItem label="Total Sugar" value={`${n.sugar != null ? `${n.sugar}g` : "--"}`} />
                   <NutritionItem label="Added Sugar" value={n.addedSugar != null ? `${n.addedSugar}g` : "--"} />
-                  <NutritionItem label="Total Fat" value={`${n.fat}g`} />
+                  <NutritionItem label="Total Fat" value={`${n.fat != null ? `${n.fat}g` : "--"}`} />
                   <NutritionItem label="Sat. Fat" value={n.saturatedFat != null ? `${n.saturatedFat}g` : "--"} />
                   <NutritionItem label="Sodium" value={n.sodium != null ? `${n.sodium}mg` : "--"} />
                   {n.fibre != null && (
@@ -184,25 +184,25 @@ export default async function ScanResultPage({ params }: PageProps) {
                     const ing = pi.ingredient;
                     // Mock warning logic for Phase 2 — Phase 3 will replace with rules engine
                     let variant: "safe" | "caution" | "flag" = "safe";
-                    if (ing.category === "Sweetener") variant = "caution";
-                    if (ing.name.toLowerCase().includes("palm")) variant = "caution";
-                    if (ing.insCode) variant = "flag";
-                    if (ing.name.includes("TBHQ")) variant = "flag";
+                    if (ing?.category === "Sweetener") variant = "caution";
+                    if ((ing?.name ?? pi.rawName ?? "").toLowerCase().includes("palm")) variant = "caution";
+                    if (ing?.additive?.insCode) variant = "flag";
+                    if ((ing?.name ?? pi.rawName ?? "").includes("TBHQ")) variant = "flag";
 
                     return (
                       <div
-                        key={pi.ingredientId}
+                        key={pi.id}
                         className="flex flex-col gap-2 rounded-lg border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
                       >
                         <div>
-                          <p className="font-medium text-foreground">{ing.name}</p>
-                          {(ing.function || ing.category) && (
+                          <p className="font-medium text-foreground">{ing?.name ?? pi.rawName ?? "Unmatched label ingredient"}</p>
+                          {(ing?.function || ing?.category) && (
                             <p className="text-xs text-foreground-muted">
-                              {ing.function || ing.category}
-                              {ing.insCode && ` (INS ${ing.insCode})`}
+                              {ing?.function || ing?.category}
+                              {ing?.additive?.insCode && ` (INS ${ing.additive.insCode})`}
                             </p>
                           )}
-                          {ing.description && (
+                          {ing?.description && (
                             <p className="mt-1 text-xs text-foreground-muted">{ing.description}</p>
                           )}
                         </div>

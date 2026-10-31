@@ -7,6 +7,8 @@ import { Newsletter } from "@/components/sections/newsletter";
 import { ScanService } from "@/features/scans/scan.service";
 import { ProductService } from "@/features/products/product.service";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Landing Page — Phase 1 & 2
  *

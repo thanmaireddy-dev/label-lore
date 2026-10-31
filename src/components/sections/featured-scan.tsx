@@ -35,10 +35,10 @@ export function FeaturedScan({ product }: FeaturedScanProps) {
   const n = product.nutrition;
   const nutritionStrip = n
     ? [
-        { label: "Calories", value: `${n.energyKcal} kcal` },
+        { label: "Calories", value: `${n.energyKcal ?? "--"} kcal` },
         { label: "Sugar", value: `${n.sugar ?? 0}g` },
         { label: "Sodium", value: `${n.sodium ?? 0}mg` },
-        { label: "Protein", value: `${n.protein}g` },
+        { label: "Protein", value: `${n.protein ?? "--"}g` },
       ]
     : [];
 
@@ -47,7 +47,7 @@ export function FeaturedScan({ product }: FeaturedScanProps) {
   if (n && n.sugar != null && n.sugar > 15) {
     flags.push({ label: `High sugar (${n.sugar}g)`, variant: "flag", icon: Droplets });
   }
-  if (product.ingredients.some((i) => i.ingredient.name.toLowerCase().includes("palm"))) {
+  if (product.ingredients.some((i) => i.ingredient?.name.toLowerCase().includes("palm"))) {
     flags.push({ label: "Contains palm oil", variant: "caution", icon: AlertTriangle });
   }
   if (product.claims.length > 0) {
@@ -104,7 +104,7 @@ export function FeaturedScan({ product }: FeaturedScanProps) {
                       {product.name}
                     </p>
                     <p className="text-xs text-foreground-muted">
-                      {product.brand.name}
+                      {product.brand?.name ?? "Unknown brand"}
                     </p>
                   </div>
                 </div>

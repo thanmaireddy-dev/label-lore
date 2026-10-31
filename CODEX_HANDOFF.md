@@ -1,9 +1,12 @@
-# CODEX_HANDOFF.md ó Instructions for the Next Coding Agent
+# CODEX_HANDOFF.md ‚Äî Instructions for the Next Coding Agent
+
+> **Current update (2026-10-31):** This note supersedes the legacy SQLite/PostgreSQL-prod setup and ‚Äúscore engine next‚Äù directions below. The Prisma schema now targets PostgreSQL with `app` and `food` schemas, and `GET /api/products/by-barcode/[barcode]` integrates OFF. The PostgreSQL migration was generated but not applied because no PostgreSQL URL is configured. SQLite file and original migration remain preserved; rows have not been transferred. Read the ‚ÄúActive architecture update‚Äù at the end before acting on the historical status below.
+
 
 ## Read These First
 
-1. **README.md** ó Setup, environment variables, and all available scripts
-2. **PROJECT_STATUS.md** ó Full implementation state, architecture, API reference, known bugs, and roadmap
+1. **README.md** ÔøΩ Setup, environment variables, and all available scripts
+2. **PROJECT_STATUS.md** ÔøΩ Full implementation state, architecture, API reference, known bugs, and roadmap
 
 ---
 
@@ -25,7 +28,7 @@
 - Product detail page at `/scan/[id]` with nutrition, ingredients, claims
 - Search widget (debounced, live dropdown) in hero and /scan page
 - Recent scans horizontal carousel on home page
-- Mock grade/score on all product displays (TEMPORARY ó replace in Phase 3)
+- Mock grade/score on all product displays (TEMPORARY ÔøΩ replace in Phase 3)
 
 ---
 
@@ -46,22 +49,22 @@
 
 ## Recommended Next Steps (Prioritized)
 
-### 1. Build the deterministic scoring engine (Phase 3) ó HIGHEST PRIORITY
+### 1. Build the deterministic scoring engine (Phase 3) ÔøΩ HIGHEST PRIORITY
 
 This is the core product value and unblocks all subsequent phases.
 
 **Files to create:**
-- `src/features/analysis/ingredient-rules.ts` ó Known INS codes with safety classification
-- `src/features/analysis/nutrition-rules.ts` ó Per-100g thresholds (FSSAI/WHO)
-- `src/features/analysis/scoring.ts` ó `scoreProduct(product: ProductWithDetails): AnalysisResult`
+- `src/features/analysis/ingredient-rules.ts` ÔøΩ Known INS codes with safety classification
+- `src/features/analysis/nutrition-rules.ts` ÔøΩ Per-100g thresholds (FSSAI/WHO)
+- `src/features/analysis/scoring.ts` ÔøΩ `scoreProduct(product: ProductWithDetails): AnalysisResult`
 
 **Files to update:**
-- `src/types/index.ts` ó Fill in `NutritionAnalysis`, `IngredientAnalysis`, `ClaimAnalysis` (currently stubs)
-- `src/app/scan/[id]/page.tsx` ó Replace mock score with `scoreProduct()` output
-- `src/app/page.tsx` ó Replace mock score mapping with `scoreProduct()` output
-- `src/components/sections/featured-scan.tsx` ó Same
+- `src/types/index.ts` ÔøΩ Fill in `NutritionAnalysis`, `IngredientAnalysis`, `ClaimAnalysis` (currently stubs)
+- `src/app/scan/[id]/page.tsx` ÔøΩ Replace mock score with `scoreProduct()` output
+- `src/app/page.tsx` ÔøΩ Replace mock score mapping with `scoreProduct()` output
+- `src/components/sections/featured-scan.tsx` ÔøΩ Same
 
-**Dependencies:** None ó uses only the existing Prisma data and domain types.
+**Dependencies:** None ÔøΩ uses only the existing Prisma data and domain types.
 
 ### 2. Create the /history page (Phase 3)
 
@@ -72,8 +75,8 @@ This is the core product value and unblocks all subsequent phases.
 ### 3. Enable OCR upload (Phase 4)
 
 - Remove `disabled` from the file input in `src/components/hero/scan-dropzone.tsx`
-- Create `src/app/api/ocr/route.ts` ó POST handler that accepts image, calls OCR provider, returns parsed ingredient text
-- Create `src/features/analysis/ingredient-parser.ts` ó Parse OCR text into ingredient list
+- Create `src/app/api/ocr/route.ts` ÔøΩ POST handler that accepts image, calls OCR provider, returns parsed ingredient text
+- Create `src/features/analysis/ingredient-parser.ts` ÔøΩ Parse OCR text into ingredient list
 - Requires: `OCR_API_KEY` environment variable
 
 ### 4. Add AI explanations (Phase 5)
@@ -112,9 +115,9 @@ This is the core product value and unblocks all subsequent phases.
 Run these before and after any change to confirm nothing is broken:
 
 ```bash
-npx tsc --noEmit          # TypeScript ó must exit 0
-npx eslint src            # ESLint ó must be 0 errors (warnings OK)
-npm run build             # Production build ó must succeed
+npx tsc --noEmit          # TypeScript ÔøΩ must exit 0
+npx eslint src            # ESLint ÔøΩ must be 0 errors (warnings OK)
+npm run build             # Production build ÔøΩ must succeed
 ```
 
 ---
@@ -126,3 +129,23 @@ Branch `main` has diverged from origin (1 local commit, 1 remote commit); a merg
 ```bash
 git commit -m "docs: finalize Phase 2 handoff documentation"
 ```
+
+## Active architecture update ‚Äî 2026-10-31
+
+### Phase 2B follow-up status
+
+`docker-compose.yml` and `.env.example` now describe a simple local PostgreSQL 16 service with credentials supplied through env vars and a persistent named volume. The runtime environment did not have Docker/Compose or PostgreSQL tools/server, so PostgreSQL could not be started and migrations were not applied.
+
+Read-only inspection of `prisma/dev.db` found 6 brands, 6 products, 9 ingredients, 15 product-ingredient relationships, 6 nutrition rows, 4 claims, 4 product-claim relationships, and 6 scans; the SQLite foreign-key check was clean. A byte-for-byte backup is at `prisma/backups/dev-pre-postgresql-20261031.db` (SHA-256 `B7E9B8CE8A99C7EB5D48AB7249EA2D69E153F5BE4F299B4E9908901078D6CEB6`). This backup is ignored by Git. Original SQLite remains untouched. A transfer is required; inspect the mapping documented in `PROJECT_STATUS.md` before writing/running it.
+
+The live Open Food Facts endpoint returned Nutella for barcode `3017620422003`. Testing the actual client and normalizer exposed a current API envelope change (`status: "success"` rather than numeric `1`); the validator/client now accept both forms and tests cover string success/failure. The normalized response included name, brand, ingredients and nutrition; missing trans fat remained explicitly null. Database persistence and internal retrieval remain unverified.
+
+The repo's app remains configured locally with a SQLite `DATABASE_URL`; configure `.env` and `.env.local` from the updated `.env.example` before trying the Compose database. Do not claim Phase 2B complete until Compose, Prisma migration/connection, SQLite transfer, and repeat barcode lookup persistence have actually been verified.
+
+The current Prisma provider is PostgreSQL with `multiSchema` enabled. `food` is the canonical reference-data domain; `app` is the usage/history domain. The earlier SQLite schema is archived under `prisma/legacy-sqlite-migrations/`, and its `prisma/dev.db` file remains untouched. The new PostgreSQL baseline migration has been generated, not applied. Do not run `migrate reset` or treat the baseline as an SQLite data transfer.
+
+OFF is the initial barcode integration. Keep its v3 response schema/client in `src/features/ingestion/`; normalize and validate before persistence. OFF imported fields and ingredient/allergen records stay unverified, source payload and observations retain provenance, and existing non-null canonical nutrition values are not replaced by a different source. The barcode route is `/api/products/by-barcode/[barcode]`. The provider read cap is per process and the successful source record cache is 24 hours; shared infrastructure is needed if deployment scales across instances.
+
+Database setup now needs PostgreSQL: configure `DATABASE_URL` from `.env.example`, then run `npx prisma migrate deploy` and `npx prisma db seed`. The seed script is idempotent and does not delete records. Existing SQLite rows require a separately reviewed backup-and-transfer step; no PostgreSQL connection was configured during this foundation work.
+
+Keep OCR, deterministic grading, AI explanations, and GS1 DataKart integration deferred. Before the next implementation step, provision PostgreSQL and plan the legacy SQLite data transfer so the six existing demonstration products remain available.

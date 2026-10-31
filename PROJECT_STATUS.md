@@ -1,6 +1,19 @@
-# PROJECT_STATUS.md — Label Reader Handoff Report
+# PROJECT_STATUS.md â€” Label Reader Handoff Report
 
-_Last updated: 2026-10-26 | Phase: 2 complete, awaiting Phase 3_
+> **Current update (2026-10-31):** The active database schema is PostgreSQL with `app` and `food` schemas. The initial PostgreSQL migration is generated but not applied because no PostgreSQL server is available in this environment. The SQLite database and migration are preserved, and a verified backup exists. The Phase 2B update below supersedes older verification notes.
+
+
+_Last updated: 2026-10-31 | Phase: PostgreSQL and ingestion foundation in progress_
+
+## Phase 2B update (2026-10-31)
+
+- Docker Compose setup added in `docker-compose.yml` with PostgreSQL 16, environment-based credentials, a health check, and a named persistent volume. `.env.example` now includes matching local connection settings.
+- This environment has no Docker, Docker Compose, PostgreSQL client, or PostgreSQL server available. Therefore the container could not be started, Prisma connection could not be checked, and no PostgreSQL migration was applied.
+- The legacy SQLite database was inspected read-only: Brand 6, Product 6, Ingredient 9, ProductIngredient 15, Nutrition 6, Claim 4, ProductClaim 4, Scan 6. `PRAGMA foreign_key_check` returned no errors. Its applied migration is `20261003215840_init`.
+- A byte-for-byte backup exists at `prisma/backups/dev-pre-postgresql-20261031.db` (SHA-256 `B7E9B8CE8A99C7EB5D48AB7249EA2D69E153F5BE4F299B4E9908901078D6CEB6`). The source `prisma/dev.db` remains untouched.
+- Transfer is needed to preserve these records. Source `Product.category` has no direct target column: map values to `food.Category` and `Product.categoryId`. SQLite `Ingredient.insCode` moves to `food.Additive` plus optional `Ingredient.additiveId`. Source products have required brands; the target allows optional brands. There are no source barcodes, users, search history, source records, or provenance observations to transfer. Preserve IDs and nullable nutrition values where compatible. Do not run a transfer until PostgreSQL is available and the backup hash is confirmed.
+- The live Open Food Facts endpoint returned Nutella for barcode `3017620422003`; the existing client and normalizer now handle the current string `status: "success"` envelope. The normalized result included name/brand, two ingredients, 539 kcal, 56.3 g sugar, 42.8 mg sodium, and `100g` basis; absent trans fat remained null and was listed in `missingFields`. Regression tests cover string success/failure statuses.
+- PostgreSQL persistence, repeat lookup deduplication, and internal product retrieval against PostgreSQL remain unverified because the database runtime is unavailable. No repository or route architecture was rewritten.
 
 ---
 
@@ -8,7 +21,7 @@ _Last updated: 2026-10-26 | Phase: 2 complete, awaiting Phase 3_
 
 Label Reader is a Next.js web application that helps Indian consumers decode food product labels. It displays ingredient analysis, nutrition facts, and marketing claims for packaged Indian food products.
 
-**Current state:** Phase 2 is feature-complete and stable. The data layer (Prisma + SQLite), all API routes, all UI components, and the server-side home page are implemented and tested. Scoring is mocked with a placeholder formula. OCR, AI explanations, authentication, and comparison features are not started.
+**Historical state at handoff:** Phase 2 used Prisma + SQLite. The current data foundation and migration status are recorded in the update banner and â€œCurrent foundation updateâ€ section below. Scoring remains a pre-existing placeholder; OCR, AI explanations, and grading are out of scope for this work.
 
 ---
 
@@ -16,65 +29,65 @@ Label Reader is a Next.js web application that helps Indian consumers decode foo
 
 ```
 prisma/
-  schema.prisma          — 7-model SQLite/PG schema
-  migrations/            — One applied migration (init)
-  seed.ts                — Seeds 6 products with full data
-  dev.db                 — Local SQLite file (gitignored)
+  schema.prisma          ï¿½ 7-model SQLite/PG schema
+  migrations/            ï¿½ One applied migration (init)
+  seed.ts                ï¿½ Seeds 6 products with full data
+  dev.db                 ï¿½ Local SQLite file (gitignored)
 
 src/
   app/
-    page.tsx             — Home page (server component; fetches real DB data)
-    layout.tsx           — Root layout: fonts, Navbar, Footer, metadata
-    globals.css          — Tailwind v4 @theme token definitions + base styles
+    page.tsx             ï¿½ Home page (server component; fetches real DB data)
+    layout.tsx           ï¿½ Root layout: fonts, Navbar, Footer, metadata
+    globals.css          ï¿½ Tailwind v4 @theme token definitions + base styles
     api/
-      products/route.ts          — GET /api/products
-      products/[id]/route.ts     — GET /api/products/[id]
-      products/search/route.ts   — GET /api/products/search?q=
-      scans/route.ts             — GET|POST /api/scans
-      scans/[id]/route.ts        — GET /api/scans/[id]
-      scans/recent/route.ts      — GET /api/scans/recent
+      products/route.ts          ï¿½ GET /api/products
+      products/[id]/route.ts     ï¿½ GET /api/products/[id]
+      products/search/route.ts   ï¿½ GET /api/products/search?q=
+      scans/route.ts             ï¿½ GET|POST /api/scans
+      scans/[id]/route.ts        ï¿½ GET /api/scans/[id]
+      scans/recent/route.ts      ï¿½ GET /api/scans/recent
     scan/
-      page.tsx                   — /scan: search-only page
-      [id]/page.tsx              — /scan/[id]: full product analysis page
+      page.tsx                   ï¿½ /scan: search-only page
+      [id]/page.tsx              ï¿½ /scan/[id]: full product analysis page
 
   components/
-    background/gradient-blobs.tsx — Animated ink-teal blob background
+    background/gradient-blobs.tsx ï¿½ Animated ink-teal blob background
     hero/
-      hero-section.tsx            — Landing hero with H1, paragraph, dropzone
-      scan-dropzone.tsx           — Search widget with debounced API calls + dropdown
+      hero-section.tsx            ï¿½ Landing hero with H1, paragraph, dropzone
+      scan-dropzone.tsx           ï¿½ Search widget with debounced API calls + dropdown
     layout/
-      navbar.tsx                  — Sticky blur-on-scroll nav, mobile slide-out menu
-      footer.tsx                  — 4-column footer with link groups
+      navbar.tsx                  ï¿½ Sticky blur-on-scroll nav, mobile slide-out menu
+      footer.tsx                  ï¿½ 4-column footer with link groups
     sections/
-      featured-scan.tsx           — Featured product card with mock score
-      recent-scans.tsx            — Horizontal scroll carousel of scan cards
-      how-it-works.tsx            — Static 3-step explainer section
-      cta-banner.tsx              — Mid-page primary CTA section
-      newsletter.tsx              — Newsletter signup form (UI only, no backend)
+      featured-scan.tsx           ï¿½ Featured product card with mock score
+      recent-scans.tsx            ï¿½ Horizontal scroll carousel of scan cards
+      how-it-works.tsx            ï¿½ Static 3-step explainer section
+      cta-banner.tsx              ï¿½ Mid-page primary CTA section
+      newsletter.tsx              ï¿½ Newsletter signup form (UI only, no backend)
     ui/
-      button.tsx                  — Reusable Button with variant/size props
-      card.tsx                    — Card + CardHeader + CardTitle + CardContent
-      status-pill.tsx             — Semantic status badge (safe/caution/flag/unknown/primary)
+      button.tsx                  ï¿½ Reusable Button with variant/size props
+      card.tsx                    ï¿½ Card + CardHeader + CardTitle + CardContent
+      status-pill.tsx             ï¿½ Semantic status badge (safe/caution/flag/unknown/primary)
 
   config/
-    site.ts                       — Site name, tagline, description, URL constants
+    site.ts                       ï¿½ Site name, tagline, description, URL constants
 
   features/
     products/
-      product.service.ts          — getAllProducts, getProductById, searchProducts
-      product.types.ts            — Prisma-derived ProductWithDetails, ProductSummary types
+      product.service.ts          ï¿½ getAllProducts, getProductById, searchProducts
+      product.types.ts            ï¿½ Prisma-derived ProductWithDetails, ProductSummary types
     scans/
-      scan.service.ts             — getRecentScans, getScanById, getAllScans, createScan
+      scan.service.ts             ï¿½ getRecentScans, getScanById, getAllScans, createScan
 
   lib/
-    animations.ts                 — Framer Motion variant presets (fadeUp, staggerContainer, etc.)
-    env.ts                        — Typed env var accessors (serverEnv, publicEnv)
-    prisma.ts                     — HMR-safe PrismaClient singleton
-    tokens.ts                     — Design token JS constants (mirrors globals.css)
-    utils.ts                      — cn() utility (clsx + tailwind-merge)
+    animations.ts                 ï¿½ Framer Motion variant presets (fadeUp, staggerContainer, etc.)
+    env.ts                        ï¿½ Typed env var accessors (serverEnv, publicEnv)
+    prisma.ts                     ï¿½ HMR-safe PrismaClient singleton
+    tokens.ts                     ï¿½ Design token JS constants (mirrors globals.css)
+    utils.ts                      ï¿½ cn() utility (clsx + tailwind-merge)
 
   types/
-    index.ts                      — Domain types: FoodProduct, Ingredient, NutritionPer100g,
+    index.ts                      ï¿½ Domain types: FoodProduct, Ingredient, NutritionPer100g,
                                     MarketingClaim, AnalysisResult, Score (Phase 3 stubs)
 ```
 
@@ -88,10 +101,10 @@ src/
 | TypeScript | 5.x | Type safety; Prisma types derived from schema |
 | Tailwind CSS v4 | 4.x | `@theme inline` design tokens; no arbitrary values in components |
 | Framer Motion | 14.x | Scroll-reveal animations, consistent easing via centralized presets |
-| Prisma | 5.22 | Type-safe ORM; schema-first; SQLite for dev, PostgreSQL for prod |
+| Prisma | 5.22 | Type-safe ORM; PostgreSQL with `app` and `food` schemas |
 | Zod | 4.x | Request body validation in API route handlers |
 | Lucide React | 1.51 | Consistent icon set |
-| SQLite (dev) | — | Zero-setup local dev; swapped for PostgreSQL in production |
+| PostgreSQL | `app` + `food` | One database with separate app activity and food reference schemas |
 
 ---
 
@@ -130,15 +143,15 @@ Key design decisions:
 - `Scan.productId` is nullable (future: OCR scans before product is matched)
 - Cascade deletes on all product-dependent tables
 
-**One migration:** `20261003215840_init` — initial full schema.
+**One migration:** `20261003215840_init` ï¿½ initial full schema.
 
 **Seed data (6 products):**
-- Maggi Masala Noodles (Nestlé) — MSG, palm oil
-- Amul Dark Chocolate — high sugar
-- Britannia Good Day Biscuits — TBHQ
-- Haldiram's Aloo Bhujia — high fat/sodium
-- Paper Boat Aam Panna — "No Preservatives", "100% Natural" claims
-- Organic Tattva Brown Rice — "Certified Organic", "High Protein" claims
+- Maggi Masala Noodles (Nestlï¿½) ï¿½ MSG, palm oil
+- Amul Dark Chocolate ï¿½ high sugar
+- Britannia Good Day Biscuits ï¿½ TBHQ
+- Haldiram's Aloo Bhujia ï¿½ high fat/sodium
+- Paper Boat Aam Panna ï¿½ "No Preservatives", "100% Natural" claims
+- Organic Tattva Brown Rice ï¿½ "Certified Organic", "High Protein" claims
 
 ---
 
@@ -163,15 +176,15 @@ Key design decisions:
 ## 7. Implemented Features
 
 - **Home page** (server-rendered) with hero, featured product card, how-it-works steps, recent scans carousel, CTA banner, newsletter form (UI only)
-- **Product search** — debounced text search in `ScanDropzone`, hitting `/api/products/search`, results shown in dropdown, click navigates to `/scan/[id]`
-- **Product detail page** (`/scan/[id]`) — shows product info, mock label score + grade, nutrition facts grid, ingredient list with mock safety labels (INS code = flag, palm oil = caution), marketing claims as pills
-- **Scan recording** — every visit to `/scan/[id]` fires `ScanService.createScan()` to record a scan event
-- **Recent scans carousel** — horizontal scroll with snap, prev/next buttons, live scroll-state tracking
-- **Featured scan section** — first product from DB, with mock score, nutrition strip, flag pills
-- **Navbar** — sticky, blur-on-scroll, mobile slide-out menu, all links wired
-- **Footer** — 4-column with product, resources, legal columns (most links marked coming soon)
-- **Design token system** — all colors, shadows, radii, and spacing as CSS custom properties in `globals.css` with Tailwind v4 `@theme` mapping
-- **Animations** — centralized Framer Motion presets; `prefers-reduced-motion` collapse
+- **Product search** ï¿½ debounced text search in `ScanDropzone`, hitting `/api/products/search`, results shown in dropdown, click navigates to `/scan/[id]`
+- **Product detail page** (`/scan/[id]`) ï¿½ shows product info, mock label score + grade, nutrition facts grid, ingredient list with mock safety labels (INS code = flag, palm oil = caution), marketing claims as pills
+- **Scan recording** ï¿½ every visit to `/scan/[id]` fires `ScanService.createScan()` to record a scan event
+- **Recent scans carousel** ï¿½ horizontal scroll with snap, prev/next buttons, live scroll-state tracking
+- **Featured scan section** ï¿½ first product from DB, with mock score, nutrition strip, flag pills
+- **Navbar** ï¿½ sticky, blur-on-scroll, mobile slide-out menu, all links wired
+- **Footer** ï¿½ 4-column with product, resources, legal columns (most links marked coming soon)
+- **Design token system** ï¿½ all colors, shadows, radii, and spacing as CSS custom properties in `globals.css` with Tailwind v4 `@theme` mapping
+- **Animations** ï¿½ centralized Framer Motion presets; `prefers-reduced-motion` collapse
 
 ---
 
@@ -190,7 +203,7 @@ Key design decisions:
 | **Product comparison** | Not started | Phase 5+ |
 | **Claim verification** | Partial | Claims displayed; no verification logic |
 | **Ingredient descriptions** | Partial | `description` field in schema but seed data doesn't populate it |
-| **`/api/products` — mode=insensitive** | SQLite limitation | `contains` is case-sensitive on SQLite; would be case-insensitive on PostgreSQL |
+| **`/api/products` ï¿½ mode=insensitive** | SQLite limitation | `contains` is case-sensitive on SQLite; would be case-insensitive on PostgreSQL |
 
 ---
 
@@ -210,21 +223,21 @@ All checks run on 2026-10-26:
 
 ## 10. Known Bugs, Technical Debt & Decisions
 
-1. **Case-sensitive SQLite search** — `ProductService.searchProducts` uses `contains` which is case-insensitive on PostgreSQL but case-sensitive on SQLite. Upgrading to PostgreSQL for production resolves this; for SQLite dev, consider using `mode: 'insensitive'` which Prisma silently ignores on SQLite.
+1. **Case-sensitive SQLite search** ï¿½ `ProductService.searchProducts` uses `contains` which is case-insensitive on PostgreSQL but case-sensitive on SQLite. Upgrading to PostgreSQL for production resolves this; for SQLite dev, consider using `mode: 'insensitive'` which Prisma silently ignores on SQLite.
 
-2. **Mock scoring** — The grade/score is a deterministic hash of product name length. It is intentionally temporary (Phase 2) and clearly labeled in code. Phase 3 replaces it.
+2. **Mock scoring** ï¿½ The grade/score is a deterministic hash of product name length. It is intentionally temporary (Phase 2) and clearly labeled in code. Phase 3 replaces it.
 
-3. **Fire-and-forget scan creation** — `/scan/[id]` calls `ScanService.createScan()` with `.catch(() => {})`. Failures are silently swallowed. Acceptable for Phase 2; Phase 3+ should log errors.
+3. **Fire-and-forget scan creation** ï¿½ `/scan/[id]` calls `ScanService.createScan()` with `.catch(() => {})`. Failures are silently swallowed. Acceptable for Phase 2; Phase 3+ should log errors.
 
-4. **No pagination UI** — API supports `limit` param but no "Load More" UI exists.
+4. **No pagination UI** ï¿½ API supports `limit` param but no "Load More" UI exists.
 
-5. **`src/types/index.ts` vs feature types** — Two separate type layers exist: domain types (`types/index.ts`) and Prisma-derived types (`features/*/product.types.ts`, `scan.service.ts`). The domain types are Phase 3 stubs; components use the Prisma types.
+5. **`src/types/index.ts` vs feature types** ï¿½ Two separate type layers exist: domain types (`types/index.ts`) and Prisma-derived types (`features/*/product.types.ts`, `scan.service.ts`). The domain types are Phase 3 stubs; components use the Prisma types.
 
-6. **No tests** — No unit or integration tests exist. The project relies on TypeScript and manual verification.
+6. **No tests** ï¿½ No unit or integration tests exist. The project relies on TypeScript and manual verification.
 
-7. **`LayoutProps<"/">` in layout.tsx** — Next.js 16 provides this type for App Router layouts; it's part of the new API, not a custom type.
+7. **`LayoutProps<"/">` in layout.tsx** ï¿½ Next.js 16 provides this type for App Router layouts; it's part of the new API, not a custom type.
 
-8. **`next.config.ts` is minimal** — No image domains, no rewrites, no redirects configured yet.
+8. **`next.config.ts` is minimal** ï¿½ No image domains, no rewrites, no redirects configured yet.
 
 ---
 
@@ -265,35 +278,47 @@ npm run dev
 
 ## 13. Prioritized Roadmap for Next Phase
 
-### Phase 3 — Deterministic Analysis Engine (Highest Priority)
+### Phase 3 ï¿½ Deterministic Analysis Engine (Highest Priority)
 
-1. **Ingredient scoring rules** — Flag INS codes in a known-bad list (621, 319, 102, etc.); categorize as safe/caution/flag based on FSSAI additive list
-2. **Nutrition benchmarking** — Compare per-100g values against FSSAI/WHO reference thresholds (high sugar > 10g, high sodium > 600mg, high saturated fat > 5g, etc.)
-3. **Claim verification** — Cross-check front-of-pack claims against nutrition data (e.g., "High Protein" requires = 10g/100g protein)
-4. **Composite grade** — Weighted score from ingredient safety + nutrition quality ? A/B/C/D grade
+1. **Ingredient scoring rules** ï¿½ Flag INS codes in a known-bad list (621, 319, 102, etc.); categorize as safe/caution/flag based on FSSAI additive list
+2. **Nutrition benchmarking** ï¿½ Compare per-100g values against FSSAI/WHO reference thresholds (high sugar > 10g, high sodium > 600mg, high saturated fat > 5g, etc.)
+3. **Claim verification** ï¿½ Cross-check front-of-pack claims against nutrition data (e.g., "High Protein" requires = 10g/100g protein)
+4. **Composite grade** ï¿½ Weighted score from ingredient safety + nutrition quality ? A/B/C/D grade
 5. **Replace mock scoring** in `page.tsx`, `featured-scan.tsx`, and `/scan/[id]/page.tsx`
 
-### Phase 4 — OCR Label Extraction
+### Phase 4 ï¿½ OCR Label Extraction
 
-6. **Enable file upload** — Activate the disabled file input in `ScanDropzone`
-7. **OCR API integration** — Send image to provider (Google Vision / Mistral OCR), parse response
-8. **Ingredient parser** — Extract ingredient list from OCR text; match to known ingredients or create new ones
+6. **Enable file upload** ï¿½ Activate the disabled file input in `ScanDropzone`
+7. **OCR API integration** ï¿½ Send image to provider (Google Vision / Mistral OCR), parse response
+8. **Ingredient parser** ï¿½ Extract ingredient list from OCR text; match to known ingredients or create new ones
 
-### Phase 5 — AI Explanation Layer
+### Phase 5 ï¿½ AI Explanation Layer
 
-9. **LLM summary** — Send structured `AnalysisResult` (from Phase 3) to an LLM; generate plain-language explanation of score
-10. **Grounded output** — AI explains WHY a product got its score; it does not produce the score
+9. **LLM summary** ï¿½ Send structured `AnalysisResult` (from Phase 3) to an LLM; generate plain-language explanation of score
+10. **Grounded output** ï¿½ AI explains WHY a product got its score; it does not produce the score
 
-### Phase 6 — Product & UX
+### Phase 6 ï¿½ Product & UX
 
-11. **History page** — List user scan history (currently a 404)
-12. **Insights page** — Aggregate insights across scans
-13. **Product comparison** — Side-by-side comparison of two products
-14. **Better alternatives** — Suggest lower-risk alternatives in the same category
-15. **Dark mode** — Design tokens already support overrides; just needs a second `:root[data-theme="dark"]` block
+11. **History page** ï¿½ List user scan history (currently a 404)
+12. **Insights page** ï¿½ Aggregate insights across scans
+13. **Product comparison** ï¿½ Side-by-side comparison of two products
+14. **Better alternatives** ï¿½ Suggest lower-risk alternatives in the same category
+15. **Dark mode** ï¿½ Design tokens already support overrides; just needs a second `:root[data-theme="dark"]` block
 
 ### Infrastructure
 
-16. **PostgreSQL migration** — Resolves case-sensitive search; required for production
-17. **Tests** — Add Vitest unit tests for the scoring engine and service layer
-18. **Authentication** — Needed before user-specific scan history
+16. **PostgreSQL migration** ï¿½ Resolves case-sensitive search; required for production
+17. **Tests** ï¿½ Add Vitest unit tests for the scoring engine and service layer
+18. **Authentication** ï¿½ Needed before user-specific scan history
+
+## Current foundation update (2026-10-31)
+
+**PostgreSQL and source-ingestion foundation implemented; migration is generated but not applied.** The active Prisma schema separates `app` and `food` in one PostgreSQL database. It adds canonical GTIN identifiers, categories, additives, allergens, source catalog/records, field observations, verification state, nullable nutrition, and application user/search/scan activity. Existing product and scan services/routes were adapted for those models.
+
+Initial Open Food Facts barcode lookup is isolated in `src/features/ingestion/`: the v3 client, Zod response validation, normalizer, and ingestion/persistence service. `GET /api/products/by-barcode/{barcode}` returns internal product records. Imports retain source response and attribution, cache successful source records for 24 hours, preserve missing fields, and never set regulatory verification. Open Food Facts values remain community-sourced and unverified. Additive tags are stored as observations, without additive risk classifications.
+
+The SQLite database `prisma/dev.db` remains intact. Its old SQLite migration was preserved under `prisma/legacy-sqlite-migrations/`; the new PostgreSQL baseline is `prisma/migrations/20261031090000_postgresql_foundation/migration.sql`. No SQLite-to-PostgreSQL data transfer or `migrate deploy` was run because no PostgreSQL URL is configured. The local `.env.local` was not changed. The seed script is now non-destructive and repeatable.
+
+Checks run: Prisma schema validation and client generation; four focused OFF client/normalizer tests; `npx tsc --noEmit`; `npm run lint` (0 warnings); and `npx next build --webpack` (successful with a placeholder PostgreSQL URL and Google Font network access). PostgreSQL connection, migration application, seed execution, SQLite transfer, and data persistence/repeat behavior remain unverified until PostgreSQL is available.
+
+Next: configure a PostgreSQL database, back up the SQLite file, implement/execute a reviewed one-time SQLite data transfer, apply the PostgreSQL baseline, and verify persistence and API behavior. Do not proceed to OCR, grading, or AI in this phase.

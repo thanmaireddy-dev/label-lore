@@ -1,10 +1,21 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
+// Canonical reference facts live in food; application activity lives in app.
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["app", "food"]
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  LABEL_CONFIRMED
+  REGULATORY_VERIFIED
+
+  @@schema("food")
 }
 
 model Brand {
@@ -13,21 +24,61 @@ model Brand {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   products  Product[]
+
+  @@schema("food")
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@schema("food")
 }
 
 model Product {
-  id          String              @id @default(cuid())
-  name        String
-  brandId     String
-  brand       Brand               @relation(fields: [brandId], references: [id])
-  category    String?
-  imageUrl    String?
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
-  ingredients ProductIngredient[]
-  nutrition   Nutrition?
-  claims      ProductClaim[]
-  scans       Scan[]
+  id                 String             @id @default(cuid())
+  name               String
+  brandId            String?
+  brand              Brand?             @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  categoryId         String?
+  category           Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  imageUrl           String?
+  packageSize        String?
+  allergensText      String?
+  verificationStatus VerificationStatus @default(UNVERIFIED)
+  missingFields      String[]           @default([])
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  identifiers        ProductIdentifier[]
+  ingredients        ProductIngredient[]
+  nutrition          Nutrition?
+  claims             ProductClaim[]
+  allergens          ProductAllergen[]
+  sourceRecords      ProductSourceRecord[]
+  fieldObservations  ProductFieldObservation[]
+  scans              Scan[]
+  searches           SearchEvent[]
+
+  @@index([name])
+  @@index([brandId])
+  @@index([categoryId])
+  @@schema("food")
+}
+
+model ProductIdentifier {
+  id        String   @id @default(cuid())
+  productId String
+  scheme    String
+  value     String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([scheme, value])
+  @@index([productId])
+  @@schema("food")
 }
 
 model Ingredient {
@@ -36,42 +87,67 @@ model Ingredient {
   normalizedName String              @unique
   category       String?
   function       String?
-  insCode        String?
   description    String?
+  additiveId     String?             @unique
+  additive       Additive?           @relation(fields: [additiveId], references: [id], onDelete: SetNull)
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
   products       ProductIngredient[]
+
+  @@schema("food")
+}
+
+model Additive {
+  id          String      @id @default(cuid())
+  insCode     String      @unique
+  commonName  String
+  function    String?
+  ingredient  Ingredient?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@schema("food")
 }
 
 model ProductIngredient {
-  id           String     @id @default(cuid())
-  productId    String
-  ingredientId String
-  order        Int
-  rawName      String?
-  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
-  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  id             String              @id @default(cuid())
+  productId      String
+  ingredientId   String?
+  sourceRecordId String?
+  order          Int
+  rawName        String?
+  verification   VerificationStatus  @default(UNVERIFIED)
+  product        Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  ingredient     Ingredient?          @relation(fields: [ingredientId], references: [id], onDelete: SetNull)
+  sourceRecord   ProductSourceRecord? @relation(fields: [sourceRecordId], references: [id], onDelete: SetNull)
 
-  @@unique([productId, ingredientId])
+  @@unique([productId, sourceRecordId, order])
   @@index([productId])
   @@index([ingredientId])
+  @@schema("food")
 }
 
 model Nutrition {
-  id           String  @id @default(cuid())
-  productId    String  @unique
-  product      Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  energyKcal   Float
-  protein      Float
-  carbohydrate Float
-  sugar        Float?
-  addedSugar   Float?
-  fat          Float
-  saturatedFat Float?
-  transFat     Float?
-  fibre        Float?
-  sodium       Float?
-  servingSizeG Float?
+  id             String              @id @default(cuid())
+  productId      String              @unique
+  sourceRecordId String?
+  energyKcal     Float?
+  protein        Float?
+  carbohydrate   Float?
+  sugar          Float?
+  addedSugar     Float?
+  fat            Float?
+  saturatedFat   Float?
+  transFat       Float?
+  fibre          Float?
+  sodium         Float?
+  servingSizeG   Float?
+  nutritionBasis String?             @default("100g")
+  verification   VerificationStatus  @default(UNVERIFIED)
+  product        Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sourceRecord   ProductSourceRecord? @relation(fields: [sourceRecordId], references: [id], onDelete: SetNull)
+
+  @@schema("food")
 }
 
 model Claim {
@@ -79,6 +155,8 @@ model Claim {
   text      String         @unique
   category  String?
   products  ProductClaim[]
+
+  @@schema("food")
 }
 
 model ProductClaim {
@@ -89,12 +167,120 @@ model ProductClaim {
   claim     Claim   @relation(fields: [claimId], references: [id], onDelete: Cascade)
 
   @@unique([productId, claimId])
+  @@schema("food")
+}
+
+model Allergen {
+  id        String            @id @default(cuid())
+  name      String            @unique
+  products  ProductAllergen[]
+
+  @@schema("food")
+}
+
+model ProductAllergen {
+  id             String              @id @default(cuid())
+  productId      String
+  allergenId     String
+  sourceRecordId String?
+  rawText        String?
+  verification   VerificationStatus  @default(UNVERIFIED)
+  product        Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  allergen       Allergen             @relation(fields: [allergenId], references: [id], onDelete: Cascade)
+  sourceRecord   ProductSourceRecord? @relation(fields: [sourceRecordId], references: [id], onDelete: SetNull)
+
+  @@unique([productId, allergenId])
+  @@schema("food")
+}
+
+model FoodSource {
+  id           String               @id @default(cuid())
+  key          String               @unique
+  name         String
+  baseUrl      String
+  license      String?
+  attribution  String
+  records      ProductSourceRecord[]
+  createdAt    DateTime             @default(now())
+
+  @@schema("food")
+}
+
+model ProductSourceRecord {
+  id              String                   @id @default(cuid())
+  productId       String
+  sourceId        String
+  externalId      String
+  sourceUrl       String
+  retrievedAt     DateTime                 @default(now())
+  sourceUpdatedAt DateTime?
+  rawPayload      Json
+  product         Product                  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  source          FoodSource               @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  observations    ProductFieldObservation[]
+  ingredients     ProductIngredient[]
+  nutrition       Nutrition[]
+  allergens       ProductAllergen[]
+
+  @@unique([sourceId, externalId])
+  @@index([productId])
+  @@index([retrievedAt])
+  @@schema("food")
+}
+
+model ProductFieldObservation {
+  id             String              @id @default(cuid())
+  productId      String
+  sourceRecordId String
+  fieldPath      String
+  value           Json
+  observedAt     DateTime            @default(now())
+  isCanonical   Boolean             @default(false)
+  product        Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sourceRecord   ProductSourceRecord @relation(fields: [sourceRecordId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceRecordId, fieldPath])
+  @@index([productId, fieldPath])
+  @@schema("food")
+}
+
+model User {
+  id        String        @id @default(cuid())
+  createdAt DateTime      @default(now())
+  scans     Scan[]
+  searches  SearchEvent[]
+
+  @@schema("app")
 }
 
 model Scan {
-  id        String   @id @default(cuid())
+  id        String     @id @default(cuid())
   productId String?
-  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
-  source    String   @default("manual") // manual, ocr
+  userId    String?
+  sessionId String?
+  source    String     @default("manual")
+  createdAt DateTime   @default(now())
+  product   Product?   @relation(fields: [productId], references: [id], onDelete: SetNull)
+  user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([sessionId, createdAt])
+  @@index([productId, createdAt])
+  @@schema("app")
+}
+
+model SearchEvent {
+  id        String   @id @default(cuid())
+  query     String
+  productId String?
+  userId    String?
+  sessionId String?
   createdAt DateTime @default(now())
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([sessionId, createdAt])
+  @@index([productId, createdAt])
+  @@schema("app")
 }

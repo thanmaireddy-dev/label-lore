@@ -1,26 +1,13 @@
 import { Prisma } from "@prisma/client";
 
-// Core types for the product feature
 export type ProductWithDetails = Prisma.ProductGetPayload<{
   include: {
     brand: true;
+    category: true;
     nutrition: true;
-    ingredients: {
-      include: {
-        ingredient: true;
-      };
-      orderBy: { order: "asc" };
-    };
-    claims: {
-      include: {
-        claim: true;
-      };
-    };
+    ingredients: { include: { ingredient: { include: { additive: true } } }; orderBy: { order: "asc" } };
+    claims: { include: { claim: true } };
   };
 }>;
 
-export type ProductSummary = Prisma.ProductGetPayload<{
-  include: {
-    brand: true;
-  };
-}>;
+export type ProductSummary = Prisma.ProductGetPayload<{ include: { brand: true; category: true } }>;
