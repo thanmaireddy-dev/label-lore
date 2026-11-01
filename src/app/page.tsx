@@ -26,35 +26,15 @@ export default async function HomePage() {
     ? await ProductService.getProductById(featuredProductId) 
     : null;
 
-  // Map DB structure to UI format. For Phase 2 we mock the scoring since
-  // the deterministic scoring engine belongs to Phase 3.
+  // Pass persisted product IDs; the grade cards load the current persisted
+  // methodology result from the grading API.
   const mappedScans: RecentScanItem[] = recentScansFromDb.map((scan) => {
-    // Generate a deterministically mock score for Phase 2 based on string length,
-    // just to make the UI look realistic until Phase 3.
-    const mockScore = scan.product?.name ? (scan.product.name.length * 7) % 100 : 50;
-    let grade: "A" | "B" | "C" | "D" = "C";
-    let status: "safe" | "caution" | "flag" = "caution";
-    let statusText = "Moderate concern";
-
-    if (mockScore >= 80) {
-      grade = "A"; status = "safe"; statusText = "No flagged additives";
-    } else if (mockScore >= 60) {
-      grade = "B"; status = "safe"; statusText = "Generally safe";
-    } else if (mockScore >= 40) {
-      grade = "C"; status = "caution"; statusText = "Check ingredients";
-    } else {
-      grade = "D"; status = "flag"; statusText = "High concern";
-    }
-
     return {
       id: scan.id,
+      productId: scan.product?.id ?? null,
       name: scan.product?.name || "Unknown Product",
       brand: scan.product?.brand?.name || "Unknown Brand",
-      grade,
-      score: mockScore,
-      status,
-      statusText,
-      scannedAgo: "Recently", // In a real app we'd use date-fns to format scan.createdAt
+      scannedAgo: "Recently",
     };
   });
 

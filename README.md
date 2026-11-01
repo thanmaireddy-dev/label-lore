@@ -6,7 +6,7 @@
 
 ## Project Purpose
 
-Label Reader is a web application that helps Indian consumers understand food product labels. Users can search for products and view a breakdown of ingredients (including INS additive codes), nutrition facts, and front-of-pack marketing claims. A deterministic, documented A–E grading engine is implemented in the backend; OCR and AI explanations remain planned. Existing product displays still use placeholder grades.
+Label Reader is a web application that helps Indian consumers understand food product labels. Users can search for products and view ingredients (including INS additive codes), nutrition facts, front-of-pack claims, and a persisted deterministic A–E nutrition profile. The score is Label Lore's own documented heuristic, not an official FSSAI rating or medical assessment. OCR and AI explanations remain planned.
 
 ---
 
@@ -187,6 +187,8 @@ OFF ingredients preserve source spelling/text and list order; normalized names o
 ### Deterministic A–E grading
 
 `POST /api/products/{id}/grade` calculates a deterministic result and upserts it by product and methodology version. The current `label-lore-npm2004-adapted-v1` method adapts published UK FSA nutrient profiling points and maps them to a Label Lore score and A–E bands. It is a project heuristic, not an FSSAI rating or medical assessment. Grading requires a `100g` basis, energy, saturated fat, total sugars, and sodium or salt; a `100ml`-only record returns `INSUFFICIENT_DATA` until a valid density conversion is available. Ingredient and additive evidence is reported without scoring because the current reference rows do not contain a verified hazard classification. See [`docs/GRADING_METHODOLOGY.md`](docs/GRADING_METHODOLOGY.md) for exact thresholds, assumptions, and references.
+
+`GET /api/products/{id}/grade` returns the result for the current methodology version, generating and persisting it when no current-version row exists. Product search results, the featured product, recent scan cards, and product detail pages use this API. The detail analysis shows the grade, score, persisted nutrient values and points, nutrition verification/completeness, and limitations. Missing required data produces “Insufficient Data” without a grade or score. Ingredient and additive identities remain separate from scoring; an INS code alone is not presented as a safety warning. See [`PROJECT_STATUS.md`](PROJECT_STATUS.md) for current verification results.
 
 For regulatory work, use current FSSAI regulations and amendments as separately maintained evidence. FSSAI is not treated as a branded product catalog. GS1 India DataKart remains deferred pending commercial access and redistribution terms. USDA FoodData Central and ICMR-NIN IFCT remain supplementary nutrient references, not authoritative Indian packaged-label records.
 

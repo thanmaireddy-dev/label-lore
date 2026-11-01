@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { ProductSummary } from "@/features/products/product.types";
+import { ProductGrade } from "@/components/analysis/product-grade";
 
 interface ScanDropzoneProps {
   className?: string;
@@ -123,14 +124,13 @@ export function ScanDropzone({ className }: ScanDropzoneProps) {
                   <li key={product.id}>
                     <Link
                       href={`/scan/${product.id}`}
-                      className="flex flex-col rounded-lg px-3 py-2 transition-colors hover:bg-foreground/5"
+                      className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-foreground/5"
                     >
-                      <span className="text-sm font-medium text-foreground">
-                        {product.name}
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-foreground">{product.name}</span>
+                        <span className="block text-xs text-foreground-muted">{product.brand?.name ?? "Unknown brand"}</span>
                       </span>
-                      <span className="text-xs text-foreground-muted">
-                        {product.brand?.name ?? "Unknown brand"}
-                      </span>
+                      <ProductGrade productId={product.id} compact />
                     </Link>
                   </li>
                 ))}

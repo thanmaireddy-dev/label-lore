@@ -1,6 +1,6 @@
 # CODEX_HANDOFF.md — Instructions for the Next Coding Agent
 
-> **Current update (2026-11-01):** PostgreSQL setup, legacy transfer, OFF persistence, and normalization are verified. The deterministic A–E engine and versioned PostgreSQL result persistence are implemented; see `docs/GRADING_METHODOLOGY.md`. Nutella scores D/35 under this explicitly non-FSSAI method. UI score displays remain mock placeholders. Prisma migrations are up to date, and the original SQLite file and backup remain preserved. This update supersedes historical status below.
+> **Current update (2026-11-01):** PostgreSQL setup, legacy transfer, OFF persistence, normalization, deterministic grading, and the product UI integration are verified. Product grade cards and analysis panels load the saved result for `label-lore-npm2004-adapted-v1` through `GET /api/products/[id]/grade`; a missing current-version row is calculated and version-upserted. Nutella renders D/35. Products without required values render Insufficient Data with the missing fields. Search, featured, recent, and detail displays no longer use mock grades, and ingredient/additive identity is separate from nutrient scoring. See `docs/GRADING_METHODOLOGY.md`. Prisma migrations are up to date, and the original SQLite file and backup remain preserved.
 
 
 ## Read These First
@@ -23,12 +23,12 @@
 ## Current Capabilities (Working)
 
 - Product and scan data stored in PostgreSQL using `food` and `app` schemas
-- REST API includes products, scans, barcode ingestion, and `POST /api/products/[id]/grade`
+- REST API includes products, scans, barcode ingestion, and `GET|POST /api/products/[id]/grade`
 - Home page renders real data from DB (server component)
 - Product detail page at `/scan/[id]` with nutrition, ingredients, claims
 - Search widget (debounced, live dropdown) in hero and /scan page
 - Recent scans horizontal carousel on home page
-- Mock grade/score remains on product displays; the deterministic engine is available separately
+- Product displays use the persisted current-version grade, with insufficient-data/loading/error states
 
 ---
 
@@ -36,7 +36,7 @@
 
 | Feature | Status |
 |---|---|
-| Deterministic scoring engine | Implemented; product-display wiring deferred |
+| Deterministic scoring engine and persisted UI integration | Implemented; see `docs/GRADING_METHODOLOGY.md` |
 | OCR image upload | UI placeholder only (input is disabled) |
 | AI/LLM explanations | NOT started |
 | /history page | Route exists in nav but no page file |
@@ -49,9 +49,9 @@
 
 ## Recommended Next Steps (Prioritized)
 
-### 1. Grading engine (core complete)
+### Grading engine and product experience (complete)
 
-`src/features/analysis/grading.ts` is pure and deterministic. `ProductGradingService` persists one row per product and methodology version, exposed by `POST /api/products/[id]/grade`. Thresholds, grade mapping, assumptions, and references are in `docs/GRADING_METHODOLOGY.md`. Existing UI mock grades are not wired to persisted results.
+`src/features/analysis/grading.ts` is pure and deterministic. `ProductGradingService` persists one row per product and methodology version. `GET /api/products/[id]/grade` returns the current methodology row or creates it when absent; POST forces a current-version recalculation. Product cards and detail analysis consume this API and validate its response contract. Thresholds, grade mapping, assumptions, and references are in `docs/GRADING_METHODOLOGY.md`. No production product display uses fabricated grades.
 
 ### 2. Create the /history page (Phase 3)
 
@@ -82,7 +82,7 @@
 
 ## Remaining product work
 
-Replacing mock grade displays with persisted results is a separate UI task. Do not add ingredient hazard classifications from INS codes alone; the current additive references contain identity/function fields but no verified hazard status.
+OCR, AI explanations, history/insights routes, and authentication remain deferred. Do not add ingredient hazard classifications from INS codes alone; the current additive references contain identity/function fields but no verified hazard status.
 
 ---
 
@@ -128,4 +128,12 @@ Ingredient normalization preserves OFF source text, order, repeated entries, and
 
 The current grading method is `label-lore-npm2004-adapted-v1`, documented in `docs/GRADING_METHODOLOGY.md`. It requires complete `100g` energy, saturated fat, total sugars, and sodium or salt data. Nutella persists as D/35 with transparent nutrient factors; two calculations update the same `(productId, methodologyVersion)` row. `POST /api/products/[id]/grade` exposes that calculation. Ingredient/additive references do not alter points because their hazard status is unverified; 100ml-only products remain ungraded without a density conversion. The method is a project heuristic and is not an FSSAI rating.
 
-The grading core is implemented. Keep OCR, AI explanations, GS1 DataKart integration, and UI wiring deferred.
+The grading core and product grading UI are implemented. Keep OCR, AI explanations, and GS1 DataKart integration deferred.
+
+## Product grading UI integration (2026-11-01)
+
+The grade API now supports GET as a current-method read-or-generate operation. It queries the unique `(productId, methodologyVersion)` row for `label-lore-npm2004-adapted-v1`, returns it unchanged when present, and computes/upserts only when that version is absent. Concurrent generation uses the existing Prisma unique key/upsert. Older methodology rows are not returned as current results. POST remains the explicit recalculation operation.
+
+`src/components/analysis/product-grade.tsx` validates API responses with the shared Zod contract, deduplicates simultaneous requests and caches successful/in-flight responses briefly. It renders grade/score, persisted factor values and points, completeness, verification, uncertainty, method version, and calculation time. Insufficient results never display a grade or score. The panel has loading, error/retry, and not-found states. Compact product search, featured, and recent scan results use the same grade component. Ingredient/additive display is neutral identity evidence; no INS-based warning is generated.
+
+Verification on 2026-11-01: production API GET returned Nutella D/35 with the current methodology; missing grades generated and repeat GET reused the same calculation timestamp; two parallel first-time GETs both received the same result/timestamp; a nonexistent product returned 404. PostgreSQL currently has three current-version grading rows (one `GRADED`, two `INSUFFICIENT_DATA`). The Nutella detail page was inspected in the browser. 26 tests pass, including three API-response contract tests. TypeScript, lint, Prisma validation, and `git diff --check` pass. `npx prisma migrate status` reports up to date. The `build` script uses Next.js's supported `--webpack` mode because Turbopack panicked while launching its CSS worker; `npm run build` succeeds with this setting.

@@ -1,9 +1,22 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ProductRepository } from "@/features/products/product.repository";
-import { scoreProduct } from "./grading";
+import { GRADING_METHODOLOGY_VERSION, scoreProduct } from "./grading";
 
 export class ProductGradingService {
+  static async getOrCalculateCurrent(productId: string) {
+    const existing = await prisma.productGradingResult.findUnique({
+      where: {
+        productId_methodologyVersion: {
+          productId,
+          methodologyVersion: GRADING_METHODOLOGY_VERSION,
+        },
+      },
+    });
+    if (existing) return existing;
+    return this.calculateAndPersist(productId);
+  }
+
   static async calculateAndPersist(productId: string) {
     const product = await ProductRepository.getById(productId);
     if (!product) return null;
@@ -32,25 +45,35 @@ export class ProductGradingService {
       })),
     });
 
-    return prisma.productGradingResult.upsert({
-      where: { productId_methodologyVersion: { productId: product.id, methodologyVersion: result.methodologyVersion } },
-      create: {
-        productId: product.id,
-        grade: result.grade,
-        score: result.score,
-        status: result.status,
-        methodologyVersion: result.methodologyVersion,
-        factors: result.factors as Prisma.InputJsonValue,
-        dataCompleteness: result.dataCompleteness as Prisma.InputJsonValue,
-      },
-      update: {
-        grade: result.grade,
-        score: result.score,
-        status: result.status,
-        factors: result.factors as Prisma.InputJsonValue,
-        dataCompleteness: result.dataCompleteness as Prisma.InputJsonValue,
-        calculatedAt: new Date(),
-      },
-    });
+    try {
+      return await prisma.productGradingResult.upsert({
+        where: { productId_methodologyVersion: { productId: product.id, methodologyVersion: result.methodologyVersion } },
+        create: {
+          productId: product.id,
+          grade: result.grade,
+          score: result.score,
+          status: result.status,
+          methodologyVersion: result.methodologyVersion,
+          factors: result.factors as Prisma.InputJsonValue,
+          dataCompleteness: result.dataCompleteness as Prisma.InputJsonValue,
+        },
+        update: {
+          grade: result.grade,
+          score: result.score,
+          status: result.status,
+          factors: result.factors as Prisma.InputJsonValue,
+          dataCompleteness: result.dataCompleteness as Prisma.InputJsonValue,
+          calculatedAt: new Date(),
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        const concurrentResult = await prisma.productGradingResult.findUnique({
+          where: { productId_methodologyVersion: { productId: product.id, methodologyVersion: result.methodologyVersion } },
+        });
+        if (concurrentResult) return concurrentResult;
+      }
+      throw error;
+    }
   }
 }

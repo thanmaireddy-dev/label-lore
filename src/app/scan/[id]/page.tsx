@@ -1,8 +1,9 @@
 import { ProductService } from "@/features/products/product.service";
 import { ScanService } from "@/features/scans/scan.service";
-import { StatusPill } from "@/components/ui/status-pill";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Flame, AlertTriangle, ShieldCheck, FileText, Beaker } from "lucide-react";
+import { StatusPill } from "@/components/ui/status-pill";
+import { Flame, ShieldCheck, FileText, Beaker } from "lucide-react";
+import { ProductGrade } from "@/components/analysis/product-grade";
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import Link from "next/link";
@@ -44,15 +45,6 @@ export default async function ScanResultPage({ params }: PageProps) {
   // Record a scan visit (fire-and-forget; failures don't block the page)
   ScanService.createScan(product.id, "manual").catch(() => {});
 
-  // Phase 2 mock scoring (Phase 3 will have deterministic scoring engine)
-  const mockScore = (product.name.length * 7) % 100;
-  let grade = "C";
-  let statusClass = "text-caution bg-caution-bg";
-  if (mockScore >= 80) { grade = "A"; statusClass = "text-safe bg-safe-bg"; }
-  else if (mockScore >= 60) { grade = "B"; statusClass = "text-safe bg-safe-bg"; }
-  else if (mockScore >= 40) { grade = "C"; statusClass = "text-caution bg-caution-bg"; }
-  else { grade = "D"; statusClass = "text-flag bg-flag-bg"; }
-
   const n = product.nutrition;
 
   return (
@@ -76,42 +68,7 @@ export default async function ScanResultPage({ params }: PageProps) {
               <p className="mb-6 text-xs text-foreground-muted">{product.category.name}</p>
             )}
 
-            <div className="border-t border-border pt-6">
-              <div className="flex items-end justify-between">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-widest text-foreground-muted">
-                    Label Score
-                  </p>
-                  <div className="mt-1 flex items-baseline gap-2">
-                    <span
-                      className={`text-4xl font-semibold ${statusClass.split(" ")[0]}`}
-                      style={{ letterSpacing: "-0.02em" }}
-                    >
-                      {mockScore}
-                    </span>
-                    <span className="text-sm text-foreground-muted">/ 100</span>
-                  </div>
-                </div>
-                <span
-                  className={`inline-flex size-14 items-center justify-center rounded-xl text-2xl font-bold ${statusClass}`}
-                >
-                  {grade}
-                </span>
-              </div>
-
-              <div className="mt-4">
-                <div className="h-2 w-full overflow-hidden rounded-full bg-border">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-flag via-caution to-safe"
-                    style={{ width: `${mockScore}%` }}
-                  />
-                </div>
-              </div>
-
-              <p className="mt-3 text-xs text-foreground-muted">
-                Deterministic scoring arrives in Phase 3.
-              </p>
-            </div>
+            <div className="border-t border-border pt-6"><ProductGrade productId={product.id} /></div>
           </div>
         </div>
 
@@ -178,41 +135,28 @@ export default async function ScanResultPage({ params }: PageProps) {
               </CardTitle>
             </CardHeader>
             <CardContent>
+              <p className="mb-4 text-xs text-foreground-muted">Ingredients are shown as source evidence. Additive codes identify substances and do not imply a safety classification or affect the nutrition grade.</p>
               {product.ingredients.length > 0 ? (
                 <div className="space-y-3">
                   {product.ingredients.map((pi) => {
                     const ing = pi.ingredient;
-                    // Mock warning logic for Phase 2 — Phase 3 will replace with rules engine
-                    let variant: "safe" | "caution" | "flag" = "safe";
-                    if (ing?.category === "Sweetener") variant = "caution";
-                    if ((ing?.name ?? pi.rawName ?? "").toLowerCase().includes("palm")) variant = "caution";
-                    if (ing?.additive?.insCode) variant = "flag";
-                    if ((ing?.name ?? pi.rawName ?? "").includes("TBHQ")) variant = "flag";
-
                     return (
                       <div
                         key={pi.id}
-                        className="flex flex-col gap-2 rounded-lg border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
+                        className="rounded-lg border border-border p-4"
                       >
                         <div>
                           <p className="font-medium text-foreground">{ing?.name ?? pi.rawName ?? "Unmatched label ingredient"}</p>
                           {(ing?.function || ing?.category) && (
                             <p className="text-xs text-foreground-muted">
                               {ing?.function || ing?.category}
-                              {ing?.additive?.insCode && ` (INS ${ing.additive.insCode})`}
+                              {ing?.additive?.insCode && ` · INS ${ing.additive.insCode}`}
                             </p>
                           )}
                           {ing?.description && (
                             <p className="mt-1 text-xs text-foreground-muted">{ing.description}</p>
                           )}
                         </div>
-                        <StatusPill variant={variant}>
-                          {variant === "flag"
-                            ? "Check"
-                            : variant === "caution"
-                            ? "Caution"
-                            : "Safe"}
-                        </StatusPill>
                       </div>
                     );
                   })}
@@ -225,16 +169,6 @@ export default async function ScanResultPage({ params }: PageProps) {
             </CardContent>
           </Card>
 
-          {/* Phase 3 placeholder */}
-          <div className="rounded-xl border border-border/50 bg-surface/50 p-6 text-center">
-            <AlertTriangle className="mx-auto mb-3 size-8 text-foreground-muted/40" strokeWidth={1} />
-            <p className="text-sm font-medium text-foreground-muted">
-              Full analysis coming in Phase 3
-            </p>
-            <p className="mt-1 text-xs text-foreground-muted/60">
-              Deterministic ingredient scoring, nutrition benchmarks, and claim verification.
-            </p>
-          </div>
         </div>
       </div>
     </div>

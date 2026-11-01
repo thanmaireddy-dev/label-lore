@@ -1,9 +1,9 @@
 # PROJECT_STATUS.md — Label Reader Handoff Report
 
-> **Current update (2026-11-01):** The deterministic grading engine is implemented and persisted. It uses methodology `label-lore-npm2004-adapted-v1`; Nutella scores 35/D from complete per-100g required nutrients. Its result is version-upserted in PostgreSQL and repeat calculation keeps one row. See the grading methodology and verification section below.
+> **Current update (2026-11-01):** The deterministic grading engine is persisted and integrated into product search, featured and recent product cards, and product detail analysis. Displays use `GET /api/products/[id]/grade` and show the current methodology result, with a real insufficient-data state when required values are missing. Nutella renders 35/D with nutrient factor details. No production product display uses mock grades or ingredient safety labels. See the grading methodology and Product grading UI integration section below.
 
 
-_Last updated: 2026-10-31 | Phase: PostgreSQL and ingestion foundation in progress_
+_Last updated: 2026-11-01 | Phase: persisted grading experience integrated_
 
 ## Phase 2B update (2026-10-31)
 
@@ -209,11 +209,11 @@ Key design decisions:
 
 - **Home page** (server-rendered) with hero, featured product card, how-it-works steps, recent scans carousel, CTA banner, newsletter form (UI only)
 - **Product search** � debounced text search in `ScanDropzone`, hitting `/api/products/search`, results shown in dropdown, click navigates to `/scan/[id]`
-- **Product detail page** (`/scan/[id]`) � shows product info, mock label score + grade, nutrition facts grid, ingredient list with mock safety labels (INS code = flag, palm oil = caution), marketing claims as pills
-- **Deterministic product grading** � pure `scoreProduct()` engine, persisted `ProductGradingResult`, and `POST /api/products/[id]/grade`; product pages still show their older mock score
+- **Product detail page** (`/scan/[id]`) � shows product info, API-backed grade and factor breakdown, nutrition facts, neutral ingredient/additive evidence, and marketing claims
+- **Deterministic product grading** � pure `scoreProduct()` engine, persisted `ProductGradingResult`, and `GET|POST /api/products/[id]/grade`; product views use the current-version persisted result
 - **Scan recording** � every visit to `/scan/[id]` fires `ScanService.createScan()` to record a scan event
 - **Recent scans carousel** � horizontal scroll with snap, prev/next buttons, live scroll-state tracking
-- **Featured scan section** � first product from DB, with mock score, nutrition strip, flag pills
+- **Featured scan section** � first product from DB with persisted grade state and source nutrition strip
 - **Navbar** � sticky, blur-on-scroll, mobile slide-out menu, all links wired
 - **Footer** � 4-column with product, resources, legal columns (most links marked coming soon)
 - **Design token system** � all colors, shadows, radii, and spacing as CSS custom properties in `globals.css` with Tailwind v4 `@theme` mapping
@@ -225,7 +225,7 @@ Key design decisions:
 
 | Feature | Status | Notes |
 |---|---|---|
-| **Grading display** | Mock only | Core deterministic engine is implemented; replacing mock grades in the UI is deferred |
+| **Grading display** | Implemented | Current-version persisted results across search, featured, recent, and detail views |
 | **OCR upload** | UI placeholder | Dropzone renders but file input is `disabled`. Phase 4 |
 | **Newsletter** | UI only | Form renders; no backend submit handler |
 | **Dark mode toggle** | Not started | Sun/Moon icons removed (unused). Design tokens are light-only |
@@ -251,6 +251,16 @@ All checks run on 2026-10-26:
 | `npx prisma generate` | ? Client generated successfully |
 | DB in sync (`prisma db push --skip-generate`) | ? Schema matches database |
 | `npm run build` | ? All 10 routes compiled, no errors |
+
+## Product grading UI integration (2026-11-01)
+
+- Added `GET /api/products/[id]/grade`: it retrieves the exact current methodology version (`label-lore-npm2004-adapted-v1`) or calculates and persists it when absent. The current version uses the unique `(productId, methodologyVersion)` upsert; old-version results are not silently returned. Existing `POST` continues to recalculate.
+- Added the shared `ProductGrade` component and Zod response contract. Search dropdown results, featured product, recent scans, and `/scan/[id]` all use actual API-backed results. Concurrent/in-flight and recent requests are briefly cached on the client to avoid duplicate calls.
+- The analysis view renders grade and score, score bar, methodology version, persisted nutrient values/points/explanations, verification and completeness, uncertainties, and calculation time. `INSUFFICIENT_DATA` has no grade and no score. Missing and invalid required fields and unsupported basis are surfaced. API error/retry, loading, product-not-found, and page not-found states are present.
+- Ingredient/additive evidence is separate from the nutrient score. INS codes are identity evidence only; mock “Safe”, “Caution”, and “Check” ingredient labels and heuristic feature pills were removed. Unavailable nutrient display values are no longer shown as zero.
+- Live API verification: Nutella returned saved `GRADED`, D/35, and methodology `label-lore-npm2004-adapted-v1`. Amul Dark Chocolate had no saved result; its GET generated `INSUFFICIENT_DATA` with null grade/score, and the repeated GET returned the same `calculatedAt`. Two parallel first-time GETs for Britannia Good Day both returned the same `INSUFFICIENT_DATA` result and timestamp. A nonexistent product returned HTTP 404. The persisted table now contains three current-method rows, one `GRADED` and two `INSUFFICIENT_DATA`.
+- Browser verification opened Nutella’s detail view and confirmed its grade/score, methodology disclaimer, nutrition facts, and neutral ingredient evidence. Frontend contract tests check all five grade bands, persisted nutrient factor presence, insufficient-data null grade/score, and malformed response rejection.
+- Checks: `npm test` — 26 passed; `npx tsc --noEmit` — passed; `npm run lint` — passed; `npx prisma validate` — passed; `npx prisma migrate status` — database up to date; `git diff --check` — passed. The `build` script uses Next.js's supported `--webpack` mode because Turbopack panicked while launching its CSS worker; `npm run build` passes with this setting. No migration or other database schema change was made.
 
 ---
 

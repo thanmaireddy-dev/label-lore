@@ -1,58 +1,30 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ShieldCheck, AlertTriangle, Droplets, Flame } from "lucide-react";
+import { Flame } from "lucide-react";
 import { fadeUp, staggerContainer, viewportOnce } from "@/lib/animations";
-import { StatusPill } from "@/components/ui/status-pill";
 import { ProductWithDetails } from "@/features/products/product.types";
 import Link from "next/link";
+import { ProductGrade } from "@/components/analysis/product-grade";
 
 interface FeaturedScanProps {
   product?: ProductWithDetails | null;
 }
 
-const gradeColors: Record<string, string> = {
-  A: "text-safe bg-safe-bg",
-  B: "text-safe bg-safe-bg",
-  C: "text-caution bg-caution-bg",
-  D: "text-flag bg-flag-bg",
-};
-
 export function FeaturedScan({ product }: FeaturedScanProps) {
   // Fallback if no product is passed
   if (!product) return null;
-
-  // Determine a mock score and grade for Phase 2.
-  // In Phase 3, this will be replaced by the actual scoring engine.
-  const mockScore = (product.name.length * 7) % 100;
-  let grade = "C";
-  if (mockScore >= 80) grade = "A";
-  else if (mockScore >= 60) grade = "B";
-  else if (mockScore >= 40) grade = "C";
-  else grade = "D";
 
   // Map database nutrition to UI display strip
   const n = product.nutrition;
   const nutritionStrip = n
     ? [
         { label: "Calories", value: `${n.energyKcal ?? "--"} kcal` },
-        { label: "Sugar", value: `${n.sugar ?? 0}g` },
-        { label: "Sodium", value: `${n.sodium ?? 0}mg` },
+        { label: "Sugar", value: n.sugar != null ? `${n.sugar}g` : "Unavailable" },
+        { label: "Sodium", value: n.sodium != null ? `${n.sodium}mg` : "Unavailable" },
         { label: "Protein", value: `${n.protein ?? "--"}g` },
       ]
     : [];
-
-  // Map database claims/ingredients to flag pills (mock logic for Phase 2)
-  const flags: { label: string; variant: "safe" | "caution" | "flag"; icon: typeof Droplets }[] = [];
-  if (n && n.sugar != null && n.sugar > 15) {
-    flags.push({ label: `High sugar (${n.sugar}g)`, variant: "flag", icon: Droplets });
-  }
-  if (product.ingredients.some((i) => i.ingredient?.name.toLowerCase().includes("palm"))) {
-    flags.push({ label: "Contains palm oil", variant: "caution", icon: AlertTriangle });
-  }
-  if (product.claims.length > 0) {
-    flags.push({ label: product.claims[0].claim.text, variant: "safe", icon: ShieldCheck });
-  }
 
   return (
     <section className="py-24 md:py-28 lg:py-32">
@@ -112,57 +84,15 @@ export function FeaturedScan({ product }: FeaturedScanProps) {
 
               {/* Right: analysis results */}
               <div className="space-y-6 p-6 md:col-span-3 md:p-8">
-                {/* Score header */}
-                <div className="flex items-start justify-between">
+                {/* Current methodology result from PostgreSQL */}
+                <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-widest text-foreground-muted">
-                      Label Score
-                    </p>
-                    <div className="mt-1 flex items-baseline gap-2">
-                      <span
-                        className={`text-4xl font-semibold ${gradeColors[grade].split(" ")[0]}`}
-                        style={{ letterSpacing: "-0.02em" }}
-                      >
-                        {mockScore}
-                      </span>
-                      <span className="text-sm text-foreground-muted">/ 100</span>
-                    </div>
-                  </div>
-                  <span
-                    className={`inline-flex size-12 items-center justify-center rounded-xl text-xl font-bold ${gradeColors[grade]}`}
-                  >
-                    {grade}
-                  </span>
-                </div>
-
-                {/* Safety score bar */}
-                <div>
-                  <div className="mb-1.5 flex justify-between text-xs text-foreground-muted">
-                    <span>Ingredient Safety</span>
-                    <span>{mockScore}%</span>
-                  </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-border">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-flag via-caution to-safe transition-all duration-700"
-                      style={{ width: `${mockScore}%` }}
-                    />
+                    <p className="mb-2 text-xs font-medium uppercase tracking-widest text-foreground-muted">Product assessment</p>
+                    <ProductGrade productId={product.id} compact />
                   </div>
                 </div>
 
-                {/* Flag pills */}
-                {flags.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {flags.map((flag) => (
-                      <StatusPill
-                        key={flag.label}
-                        variant={flag.variant}
-                        icon={<flag.icon className="size-3.5" strokeWidth={1.75} />}
-                      >
-                        {flag.label}
-                      </StatusPill>
-                    ))}
-                  </div>
-                )}
+                {product.ingredients.length > 0 && <p className="text-xs text-foreground-muted">{product.ingredients.length} source-listed ingredients · identities are shown without safety labels</p>}
 
                 {/* Nutrition strip */}
                 {nutritionStrip.length > 0 && (
