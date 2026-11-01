@@ -1,6 +1,6 @@
 # CODEX_HANDOFF.md — Instructions for the Next Coding Agent
 
-> **Current update (2026-10-31):** This note supersedes the legacy SQLite/PostgreSQL-prod setup and “score engine next” directions below. PostgreSQL baseline and legacy SQLite transfer are complete; live barcode persistence is verified. The additive `salt` nutrition migration is applied, and the OFF ingredient/nutrition normalization tests pass. Prisma reports up to date. The original SQLite file and matching backup are preserved. Read the “Active architecture update” at the end before acting on historical status below.
+> **Current update (2026-11-01):** PostgreSQL setup, legacy transfer, OFF persistence, and normalization are verified. The deterministic A–E engine and versioned PostgreSQL result persistence are implemented; see `docs/GRADING_METHODOLOGY.md`. Nutella scores D/35 under this explicitly non-FSSAI method. UI score displays remain mock placeholders. Prisma migrations are up to date, and the original SQLite file and backup remain preserved. This update supersedes historical status below.
 
 
 ## Read These First
@@ -15,20 +15,20 @@
 - **Inspect before editing.** Read the relevant source file before changing anything. The actual code may differ from this document.
 - **Preserve the architecture.** Features are organised as service classes in `src/features/`. API routes delegate to these services. Do not collapse service methods into route handlers.
 - **Use existing primitives.** UI components (Button, Card, StatusPill), design tokens (globals.css), and animation presets (lib/animations.ts) already exist. Use them.
-- **Do not assume planned features are implemented.** Scoring, OCR, AI, history, and insights are explicitly listed as NOT implemented.
+- **Do not assume planned features are implemented.** Scoring is implemented as a backend service; UI wiring, OCR, AI, history, and insights remain incomplete.
 - **Do not restart or rewrite.** The existing data layer, API routes, and UI are working. Build on them.
 
 ---
 
 ## Current Capabilities (Working)
 
-- Product and scan data stored in SQLite via Prisma
-- REST API: products list, product by ID, product search, scans list, scan by ID, recent scans, create scan
+- Product and scan data stored in PostgreSQL using `food` and `app` schemas
+- REST API includes products, scans, barcode ingestion, and `POST /api/products/[id]/grade`
 - Home page renders real data from DB (server component)
 - Product detail page at `/scan/[id]` with nutrition, ingredients, claims
 - Search widget (debounced, live dropdown) in hero and /scan page
 - Recent scans horizontal carousel on home page
-- Mock grade/score on all product displays (TEMPORARY � replace in Phase 3)
+- Mock grade/score remains on product displays; the deterministic engine is available separately
 
 ---
 
@@ -36,7 +36,7 @@
 
 | Feature | Status |
 |---|---|
-| Deterministic scoring engine | NOT started |
+| Deterministic scoring engine | Implemented; product-display wiring deferred |
 | OCR image upload | UI placeholder only (input is disabled) |
 | AI/LLM explanations | NOT started |
 | /history page | Route exists in nav but no page file |
@@ -49,22 +49,9 @@
 
 ## Recommended Next Steps (Prioritized)
 
-### 1. Build the deterministic scoring engine (Phase 3) � HIGHEST PRIORITY
+### 1. Grading engine (core complete)
 
-This is the core product value and unblocks all subsequent phases.
-
-**Files to create:**
-- `src/features/analysis/ingredient-rules.ts` � Known INS codes with safety classification
-- `src/features/analysis/nutrition-rules.ts` � Per-100g thresholds (FSSAI/WHO)
-- `src/features/analysis/scoring.ts` � `scoreProduct(product: ProductWithDetails): AnalysisResult`
-
-**Files to update:**
-- `src/types/index.ts` � Fill in `NutritionAnalysis`, `IngredientAnalysis`, `ClaimAnalysis` (currently stubs)
-- `src/app/scan/[id]/page.tsx` � Replace mock score with `scoreProduct()` output
-- `src/app/page.tsx` � Replace mock score mapping with `scoreProduct()` output
-- `src/components/sections/featured-scan.tsx` � Same
-
-**Dependencies:** None � uses only the existing Prisma data and domain types.
+`src/features/analysis/grading.ts` is pure and deterministic. `ProductGradingService` persists one row per product and methodology version, exposed by `POST /api/products/[id]/grade`. Thresholds, grade mapping, assumptions, and references are in `docs/GRADING_METHODOLOGY.md`. Existing UI mock grades are not wired to persisted results.
 
 ### 2. Create the /history page (Phase 3)
 
@@ -93,20 +80,9 @@ This is the core product value and unblocks all subsequent phases.
 
 ---
 
-## First Feature to Implement Next
+## Remaining product work
 
-**Deterministic ingredient scoring** in `src/features/analysis/scoring.ts`.
-
-**Minimal viable implementation:**
-1. Create an INS code danger list (e.g. 102 Tartrazine, 110 Sunset Yellow, 319/320 TBHQ/BHA, 621 MSG, 951 Aspartame)
-2. For each product ingredient: look up INS code ? assign "safe" | "caution" | "flag"
-3. Compute score: start at 100, deduct points per flag (e.g. -20 for "flag", -10 for "caution")
-4. Apply nutrition deductions: sugar > 10g (-10), sodium > 600mg (-10), saturated fat > 5g (-10)
-5. Map final score to grade: >=80=A, >=60=B, >=40=C, <40=D
-6. Return a typed `AnalysisResult` object
-7. Wire into `/scan/[id]/page.tsx`, replacing the mock
-
-**No new dependencies needed.** Uses existing Prisma types and domain types from `src/types/index.ts`.
+Replacing mock grade displays with persisted results is a separate UI task. Do not add ingredient hazard classifications from INS codes alone; the current additive references contain identity/function fields but no verified hazard status.
 
 ---
 
@@ -150,4 +126,6 @@ For a new local setup, copy `.env.example` to `.env` and `.env.local`, set match
 
 Ingredient normalization preserves OFF source text, order, repeated entries, and parenthetical qualifiers. Nutrition stores energy in kcal, macros/fiber/salt in grams, and sodium in milligrams; salt is a separate nullable `food.Nutrition.salt` field added by `20261031120000_add_salt_nutrition`. The live Nutella response verified 0.107 g salt and 42.8 mg sodium at a 100g basis, with unavailable trans fat null and verification still `UNVERIFIED`. Re-running repository persistence twice reused the same Nutella product/identifier/source record and left 7 products, 9 ingredients, 17 product-ingredient links, and 7 nutrition rows. Source provenance remains intact; the new salt field observation raised that record's observations from 23 to 24.
 
-Keep OCR, deterministic grading, AI explanations, and GS1 DataKart integration deferred.
+The current grading method is `label-lore-npm2004-adapted-v1`, documented in `docs/GRADING_METHODOLOGY.md`. It requires complete `100g` energy, saturated fat, total sugars, and sodium or salt data. Nutella persists as D/35 with transparent nutrient factors; two calculations update the same `(productId, methodologyVersion)` row. `POST /api/products/[id]/grade` exposes that calculation. Ingredient/additive references do not alter points because their hazard status is unverified; 100ml-only products remain ungraded without a density conversion. The method is a project heuristic and is not an FSSAI rating.
+
+The grading core is implemented. Keep OCR, AI explanations, GS1 DataKart integration, and UI wiring deferred.

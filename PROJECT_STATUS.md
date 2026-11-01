@@ -1,6 +1,6 @@
 # PROJECT_STATUS.md — Label Reader Handoff Report
 
-> **Current update (2026-10-31):** The PostgreSQL baseline and six-row legacy SQLite transfer are verified. The live barcode flow also persisted Nutella (3017620422003), returned the same internal ID on repeat lookup, and retrieved it by ID. Invalid and missing barcode responses were verified. See the Phase 2B update and barcode workflow section for counts and checks.
+> **Current update (2026-11-01):** The deterministic grading engine is implemented and persisted. It uses methodology `label-lore-npm2004-adapted-v1`; Nutella scores 35/D from complete per-100g required nutrients. Its result is version-upserted in PostgreSQL and repeat calculation keeps one row. See the grading methodology and verification section below.
 
 
 _Last updated: 2026-10-31 | Phase: PostgreSQL and ingestion foundation in progress_
@@ -36,13 +36,23 @@ _Last updated: 2026-10-31 | Phase: PostgreSQL and ingestion foundation in progre
 - The live repository persistence method was run twice with the same fetched OFF payload. Product count stayed 7, ingredient count 9, product-ingredient relationship count 17, and nutrition count 7. The GTIN/source record remained unique; observations increased from 23 to 24 because the new explicit `nutrition.salt` observation was added.
 - Focused tests cover structured/text extraction, order, repeats, punctuation/case/whitespace normalization, per-100ml preference, kJ and sodium/salt unit conversions, invalid/null values, and repeated lookup cache behavior. Fourteen ingestion tests pass.
 
+## Deterministic grading engine (2026-11-01)
+
+- Methodology is documented in `docs/GRADING_METHODOLOGY.md`. Nutrient cutoffs are adapted from the UK FSA 2004/05 nutrient profiling model. Those published points are not FSSAI limits. Label Lore separately maps `round(clamp(100 - 2.5 × (adverse points - eligible positive points), 0, 100))` to A (80–100), B (60–79), C (40–59), D (20–39), and E (0–19); this mapping is a project heuristic, not an official rating.
+- Required data are a `100g` basis, energy, saturated fat, total sugars, and sodium or salt. Missing, invalid, negative, non-finite, or unsupported-basis requirements yield `INSUFFICIENT_DATA` with no grade or score. Per-100ml values are not compared to per-100g thresholds without density. Salt is converted to sodium equivalent only if sodium is unavailable (400 mg sodium per gram salt); sodium is preferred if both are present. Optional missing or invalid fibre/protein earn no benefit. Protein points follow the NPM high-adverse-points gate; no FVNS percentage is estimated.
+- Ingredient/additive evidence is shown separately with zero scoring effect. Existing INS 319 and INS 621 rows supply names/functions but no source or verification/hazard classification; an INS number alone does not imply harm. Unknown codes are also neutral.
+- Added pure deterministic module `src/features/analysis/grading.ts`, PostgreSQL-backed `ProductGradingService`, and `POST /api/products/[id]/grade`. `ProductGradingResult` stores status, grade/score (nullable for insufficient data), methodology version, JSON factors/completeness, and calculation timestamp. Unique `[productId, methodologyVersion]` makes recalculation update the existing result. Migration `20261101100000_product_grading_results` adds the table.
+- Nutella (`3017620422003`) receives **D, score 35**, status `GRADED`, version `label-lore-npm2004-adapted-v1`, and net NPM points 26. Breakdown: energy 2,255.176 kJ/100g = 6 adverse points; saturated fat 10.6 g = 10; total sugars 56.3 g = 10; sodium 42.8 mg = 0; fibre 0 g = 0 positive; protein 6.3 g is omitted because adverse points exceed 10 and FVNS percentage is unavailable. Trans fat remains null and is not scored. Nutrition is still `UNVERIFIED` and this uncertainty is persisted with the assessment.
+- PostgreSQL persistence was executed twice for Nutella: the same grading row ID was returned both times and row count remained 1 for this product/methodology version. No product, nutrition, ingredient, or source provenance records were changed by grade persistence.
+- Tests cover all five bands, each adverse factor and threshold edge, salt conversion/preference, fibre/protein rules, missing/null/invalid data, unsupported 100ml basis, different ingredient/additive lists, unknown additive neutrality, determinism, and Nutella. The combined suite has 23 passing tests. Prisma validation and migration status, TypeScript, lint, production build, and `git diff --check` are verified for this update.
+
 ---
 
 ## 1. Project Overview & Implementation Status
 
 Label Reader is a Next.js web application that helps Indian consumers decode food product labels. It displays ingredient analysis, nutrition facts, and marketing claims for packaged Indian food products.
 
-**Historical state at handoff:** Phase 2 used Prisma + SQLite. The current data foundation and migration status are recorded in the update banner and “Current foundation update” section below. Scoring remains a pre-existing placeholder; OCR, AI explanations, and grading are out of scope for this work.
+**Historical state at handoff:** Phase 2 used Prisma + SQLite and the UI displayed placeholder scores. The backend now has a deterministic grading engine and persisted results; UI score displays remain placeholders. OCR and AI explanations remain out of scope.
 
 ---
 
@@ -182,6 +192,7 @@ Key design decisions:
 |---|---|---|
 | GET | `/api/products` | List all products. `?limit=N` (default 50, max 100) |
 | GET | `/api/products/[id]` | Single product with brand, ingredients, nutrition, claims |
+| POST | `/api/products/[id]/grade` | Calculate and persist the current versioned deterministic grade |
 | GET | `/api/products/search` | Search by name/brand/category. `?q=query` |
 | GET | `/api/scans` | List all scans with product. `?limit=N` |
 | POST | `/api/scans` | Create scan. Body: `{ productId, source?: "manual"|"ocr" }` |
@@ -199,6 +210,7 @@ Key design decisions:
 - **Home page** (server-rendered) with hero, featured product card, how-it-works steps, recent scans carousel, CTA banner, newsletter form (UI only)
 - **Product search** � debounced text search in `ScanDropzone`, hitting `/api/products/search`, results shown in dropdown, click navigates to `/scan/[id]`
 - **Product detail page** (`/scan/[id]`) � shows product info, mock label score + grade, nutrition facts grid, ingredient list with mock safety labels (INS code = flag, palm oil = caution), marketing claims as pills
+- **Deterministic product grading** � pure `scoreProduct()` engine, persisted `ProductGradingResult`, and `POST /api/products/[id]/grade`; product pages still show their older mock score
 - **Scan recording** � every visit to `/scan/[id]` fires `ScanService.createScan()` to record a scan event
 - **Recent scans carousel** � horizontal scroll with snap, prev/next buttons, live scroll-state tracking
 - **Featured scan section** � first product from DB, with mock score, nutrition strip, flag pills
@@ -213,7 +225,7 @@ Key design decisions:
 
 | Feature | Status | Notes |
 |---|---|---|
-| **Scoring engine** | Mock only | Score = `(name.length * 7) % 100`. Phase 3 will replace with deterministic rules |
+| **Grading display** | Mock only | Core deterministic engine is implemented; replacing mock grades in the UI is deferred |
 | **OCR upload** | UI placeholder | Dropzone renders but file input is `disabled`. Phase 4 |
 | **Newsletter** | UI only | Form renders; no backend submit handler |
 | **Dark mode toggle** | Not started | Sun/Moon icons removed (unused). Design tokens are light-only |
@@ -246,7 +258,7 @@ All checks run on 2026-10-26:
 
 1. **Case-sensitive SQLite search** � `ProductService.searchProducts` uses `contains` which is case-insensitive on PostgreSQL but case-sensitive on SQLite. Upgrading to PostgreSQL for production resolves this; for SQLite dev, consider using `mode: 'insensitive'` which Prisma silently ignores on SQLite.
 
-2. **Mock scoring** � The grade/score is a deterministic hash of product name length. It is intentionally temporary (Phase 2) and clearly labeled in code. Phase 3 replaces it.
+2. **Mock scoring UI** � The home and product detail displays still show the old placeholder score. The deterministic grading service and API now exist but have not been wired into those views.
 
 3. **Fire-and-forget scan creation** � `/scan/[id]` calls `ScanService.createScan()` with `.catch(() => {})`. Failures are silently swallowed. Acceptable for Phase 2; Phase 3+ should log errors.
 
@@ -299,13 +311,13 @@ npm run dev
 
 ## 13. Prioritized Roadmap for Next Phase
 
-### Phase 3 � Deterministic Analysis Engine (Highest Priority)
+### Phase 3 � Deterministic Analysis Engine (Core grading complete; UI wiring deferred)
 
-1. **Ingredient scoring rules** � Flag INS codes in a known-bad list (621, 319, 102, etc.); categorize as safe/caution/flag based on FSSAI additive list
-2. **Nutrition benchmarking** � Compare per-100g values against FSSAI/WHO reference thresholds (high sugar > 10g, high sodium > 600mg, high saturated fat > 5g, etc.)
+1. **Deterministic A–E engine** � Implemented with documented UK NPM-derived nutrient points and Label Lore grade mapping; additive hazard scoring is intentionally absent until verified references exist
+2. **Nutrition benchmarking** � Implemented in `src/features/analysis/grading.ts`; 100ml-only records remain ungraded without density conversion
 3. **Claim verification** � Cross-check front-of-pack claims against nutrition data (e.g., "High Protein" requires = 10g/100g protein)
-4. **Composite grade** � Weighted score from ingredient safety + nutrition quality ? A/B/C/D grade
-5. **Replace mock scoring** in `page.tsx`, `featured-scan.tsx`, and `/scan/[id]/page.tsx`
+4. **Persisted methodology results** � Implemented as versioned `food.ProductGradingResult` rows
+5. **Replace mock scoring** in `page.tsx`, `featured-scan.tsx`, and `/scan/[id]/page.tsx` (not part of this task)
 
 ### Phase 4 � OCR Label Extraction
 
@@ -342,4 +354,4 @@ The baseline migration `prisma/migrations/20261031090000_postgresql_foundation/m
 
 Counts reconcile with SQLite: Brand 6, Product 6, Ingredient 9, ProductIngredient 15, Nutrition 6, Claim 4, ProductClaim 4, Scan 6; PostgreSQL additionally has 6 mapped categories and 2 mapped additives. PostgreSQL has 22 validated foreign keys and zero imported relationship orphans. `npx prisma migrate status` reports up to date. The original SQLite source and backup still share SHA-256 `B7E9B8CE8A99C7EB5D48AB7249EA2D69E153F5BE4F299B4E9908901078D6CEB6`.
 
-Checks run in this phase include the additive salt migration, live OFF Nutella persistence twice, PostgreSQL record and relationship checks, Prisma validation/status, 14 ingestion tests, TypeScript, lint, production build, and `git diff --check`. The baseline and legacy transfer are complete; barcode persistence and internal API retrieval have also been verified. Keep OCR, grading, and AI deferred.
+Checks recorded at this point include the additive salt migration, live OFF Nutella persistence twice, PostgreSQL record and relationship checks, Prisma validation/status, 14 ingestion tests, TypeScript, lint, production build, and `git diff --check`. Barcode persistence and internal API retrieval are verified. The current grading engine, migration, API test, and 23-test run are documented in the 2026-11-01 section above. Keep OCR and AI deferred.

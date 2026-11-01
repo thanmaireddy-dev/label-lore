@@ -6,7 +6,7 @@
 
 ## Project Purpose
 
-Label Reader is a web application that helps Indian consumers understand food product labels. Users can search for products and view a breakdown of ingredients (including INS additive codes), nutrition facts, and front-of-pack marketing claims. The current implementation covers product and scan data management with a UI foundation; deterministic scoring, OCR, and AI explanations are planned for later phases.
+Label Reader is a web application that helps Indian consumers understand food product labels. Users can search for products and view a breakdown of ingredients (including INS additive codes), nutrition facts, and front-of-pack marketing claims. A deterministic, documented A–E grading engine is implemented in the backend; OCR and AI explanations remain planned. Existing product displays still use placeholder grades.
 
 ---
 
@@ -106,7 +106,7 @@ Open http://localhost:3000
 | `npm run build` | Production build |
 | `npm run start` | Start production server |
 | `npm run lint` | Run ESLint |
-| `npm run test` | Run Open Food Facts client and normalizer tests |
+| `npm run test` | Run OFF ingestion and deterministic grading tests |
 | `npm run db:migrate:legacy` | Safely transfer rows from the preserved SQLite database |
 | `npx tsc --noEmit` | TypeScript type check |
 | `npx prisma generate` | Regenerate Prisma client |
@@ -184,6 +184,10 @@ Each lookup preserves the source product response, source URL, external ID, retr
 
 OFF ingredients preserve source spelling/text and list order; normalized names only standardize Unicode form, casing, whitespace, and punctuation spacing. Repeated ingredient entries are retained in order, and missing lists do not create empty ingredient rows. Nutrition prefers the declared `100g`/`100ml` basis, stores energy in kcal, macros/fiber/salt in grams, and sodium in milligrams. Salt and sodium remain separate; invalid or missing values stay null. The nullable `food.Nutrition.salt` field was added by migration `20261031120000_add_salt_nutrition`.
 
+### Deterministic A–E grading
+
+`POST /api/products/{id}/grade` calculates a deterministic result and upserts it by product and methodology version. The current `label-lore-npm2004-adapted-v1` method adapts published UK FSA nutrient profiling points and maps them to a Label Lore score and A–E bands. It is a project heuristic, not an FSSAI rating or medical assessment. Grading requires a `100g` basis, energy, saturated fat, total sugars, and sodium or salt; a `100ml`-only record returns `INSUFFICIENT_DATA` until a valid density conversion is available. Ingredient and additive evidence is reported without scoring because the current reference rows do not contain a verified hazard classification. See [`docs/GRADING_METHODOLOGY.md`](docs/GRADING_METHODOLOGY.md) for exact thresholds, assumptions, and references.
+
 For regulatory work, use current FSSAI regulations and amendments as separately maintained evidence. FSSAI is not treated as a branded product catalog. GS1 India DataKart remains deferred pending commercial access and redistribution terms. USDA FoodData Central and ICMR-NIN IFCT remain supplementary nutrient references, not authoritative Indian packaged-label records.
 
-The PostgreSQL baseline, legacy SQLite transfer, and nullable salt migration have been applied and verified. The live Nutella lookup (`3017620422003`) and repeat repository ingestion preserve its product ID and unique source/identifier records; its 0.107 g salt and 42.8 mg sodium remain distinct at a `100g` basis. Prisma reports migration status up to date. SQLite row counts reconcile with PostgreSQL; the original source and verified backup are unchanged. Detailed normalization and verification results are in `PROJECT_STATUS.md`. OCR, scoring, and AI explanation remain out of scope.
+The PostgreSQL baseline, legacy SQLite transfer, salt migration, and grading-result migration are applied and verified. Nutella (`3017620422003`) returns a persisted grade of D/35 under the documented heuristic; repeated calculation updates the single result row for that methodology version. Prisma reports migration status up to date. SQLite and its verified backup remain unchanged. Detailed normalization and verification results are in `PROJECT_STATUS.md`. OCR, AI explanation, and wiring the new result into existing UI views remain out of scope.
