@@ -6,7 +6,7 @@
 
 ## Project Purpose
 
-Label Reader is a web application that helps Indian consumers understand food product labels. Users can search for products and view ingredients (including INS additive codes), nutrition facts, front-of-pack claims, and a persisted deterministic A–E nutrition profile. The score is Label Lore's own documented heuristic, not an official FSSAI rating or medical assessment. AI grade explanations are available on product detail pages when the optional OpenAI server configuration is set; OCR remains planned.
+Label Reader is a web application that helps Indian consumers understand food product labels. Users can search for products and view ingredients (including INS additive codes), nutrition facts, front-of-pack claims, and a persisted deterministic A–E nutrition profile. The score is Label Lore's own documented heuristic, not an official FSSAI rating or medical assessment. AI grade explanations are available on product detail pages when the optional OpenAI server configuration is set; food-label OCR can extract editable unverified text from uploaded images.
 
 ---
 
@@ -106,7 +106,7 @@ Open http://localhost:3000
 | `npm run build` | Production build |
 | `npm run start` | Start production server |
 | `npm run lint` | Run ESLint |
-| `npm run test` | Run OFF ingestion and deterministic grading tests |
+| `npm run test` | Run ingestion, grading, and OCR extraction tests |
 | `npm run db:migrate:legacy` | Safely transfer rows from the preserved SQLite database |
 | `npx tsc --noEmit` | TypeScript type check |
 | `npx prisma generate` | Regenerate Prisma client |
@@ -123,7 +123,6 @@ Open http://localhost:3000
 | `DATABASE_URL` | Yes | PostgreSQL connection string; Prisma manages `app` and `food` schemas |
 | `NEXT_PUBLIC_SITE_URL` | Yes | Public URL for metadata/OG tags |
 | `NEXT_PUBLIC_APP_VERSION` | No | Version string (display only) |
-| `OCR_API_KEY` | No (Phase 4) | OCR provider API key |
 | `OPENAI_API_KEY` | No | Optional server-only key for grade explanations |
 | `OPENAI_MODEL` | No | OpenAI model ID for grade explanations |
 
@@ -193,7 +192,7 @@ OFF ingredients preserve source spelling/text and list order; normalized names o
 
 For regulatory work, use current FSSAI regulations and amendments as separately maintained evidence. FSSAI is not treated as a branded product catalog. GS1 India DataKart remains deferred pending commercial access and redistribution terms. USDA FoodData Central and ICMR-NIN IFCT remain supplementary nutrient references, not authoritative Indian packaged-label records.
 
-The PostgreSQL baseline, legacy SQLite transfer, salt migration, and grading-result migration are applied and verified. Nutella (`3017620422003`) returns a persisted grade of D/35 under the documented heuristic; repeated calculation updates the single result row for that methodology version. Prisma reports migration status up to date. SQLite and its verified backup remain unchanged. Detailed normalization and verification results are in `PROJECT_STATUS.md`. OCR remains out of scope; grade explanations are implemented below.
+The PostgreSQL baseline, legacy SQLite transfer, salt migration, and grading-result migration are applied and verified. Nutella (`3017620422003`) returns a persisted grade of D/35 under the documented heuristic; repeated calculation updates the single result row for that methodology version. Prisma reports migration status up to date. SQLite and its verified backup remain unchanged. Detailed normalization and verification results are in `PROJECT_STATUS.md`. Grade explanations and local OCR are implemented below.
 
 ## AI grade explanations (Phase 5, 2026-11-08)
 
@@ -202,3 +201,9 @@ Product detail pages now include an explicit, user-triggered grade explanation p
 To enable generation locally, add `OPENAI_API_KEY` and `OPENAI_MODEL` to the private server environment (`.env` and `.env.local`); never expose the key through a `NEXT_PUBLIC_` variable. Missing configuration is supported and the detail UI shows a setup message. Products with insufficient grading data always receive deterministic explanation text without an AI call.
 
 Verification for this update: the additive explanation migration `20261108120000_product_grade_explanations` is applied; Prisma status reports the database up to date. Docker reports `label-lore-postgres` healthy and Prisma connects. The explanation API has explicit GET/POST behavior and errors for missing products, rate limits, timeouts, provider errors and invalid output. Focused provider/service/contract tests use mocks; no live OpenAI request was performed.
+
+## Food label OCR (Phase 6, 2026-11-08)
+
+The scan page accepts JPEG, PNG, and WebP images up to 8 MB. The Node.js route checks type, size, non-empty content, and image signatures, then uses Tesseract.js locally through WebAssembly to read English text. Images stay in request memory and are not saved. Tesseract's English trained data downloads on first use and is cached under ignored `node_modules/.cache/label-lore-tesseract`, so first-time operation needs outbound access; recognition runs locally after that. OCR is not guaranteed accurate.
+
+`POST /api/ocr` accepts multipart form data with the `image` field and returns preserved raw OCR text, best-effort ingredients and nutrition fields, source snippets, explicit nulls, and warnings. Energy is normalized to kcal, nutrient masses to g, sodium to mg, and a readable per-100g/per-100ml basis is recorded. Salt and sodium remain separate. The review UI lets users edit parsed values and labels changed values as user corrections. OCR drafts are not saved as branded products or sent to grading.

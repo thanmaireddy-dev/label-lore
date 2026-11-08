@@ -1,9 +1,9 @@
 # PROJECT_STATUS.md — Label Reader Handoff Report
 
-> **Current update (2026-11-08):** The persisted deterministic grading engine and product UI integration remain verified. Phase 5 AI grade explanations are now implemented with optional server-side OpenAI configuration, persisted prompt/methodology versions, deterministic insufficient-data responses, and a detail-page panel. No live OpenAI call was made because credentials are absent.
+> **Current update (2026-11-08):** The persisted deterministic grading engine and product UI integration remain verified. Phase 5 AI grade explanations and Phase 6 local food-label OCR are implemented. OCR returns raw text plus editable unverified ingredient/nutrition drafts, without persisting products or grading them.
 
 
-_Last updated: 2026-11-08 | Phase: persisted grading and explanation experience_
+_Last updated: 2026-11-08 | Phase: grading, explanations, and local OCR extraction_
 
 ## Phase 2B update (2026-10-31)
 
@@ -52,7 +52,7 @@ _Last updated: 2026-11-08 | Phase: persisted grading and explanation experience_
 
 Label Reader is a Next.js web application that helps Indian consumers decode food product labels. It displays ingredient analysis, nutrition facts, and marketing claims for packaged Indian food products.
 
-**Historical note:** Earlier handoff snapshots described placeholder score displays. The grading engine and UI integration are now complete; AI grade explanations are implemented in the 2026-11-08 update. OCR remains out of scope.
+**Historical note:** Earlier handoff snapshots described placeholder score displays. The grading engine and UI integration are now complete; AI grade explanations are implemented in the 2026-11-08 update. OCR extraction is implemented; OCR-to-grading remains deferred.
 
 ---
 
@@ -226,7 +226,7 @@ Key design decisions:
 | Feature | Status | Notes |
 |---|---|---|
 | **Grading display** | Implemented | Current-version persisted results across search, featured, recent, and detail views |
-| **OCR upload** | UI placeholder | Dropzone renders but file input is `disabled`. Phase 4 |
+| **OCR upload** | Implemented | Local Tesseract.js extraction and editable unverified review; OCR-to-grading deferred |
 | **Newsletter** | UI only | Form renders; no backend submit handler |
 | **Dark mode toggle** | Not started | Sun/Moon icons removed (unused). Design tokens are light-only |
 | **History page** (`/history`) | 404 | Nav link exists, page does not |
@@ -291,7 +291,7 @@ All checks run on 2026-10-26:
 | `DATABASE_URL` | Server | SQLite or PostgreSQL connection string |
 | `NEXT_PUBLIC_SITE_URL` | Public | Base URL for metadata |
 | `NEXT_PUBLIC_APP_VERSION` | Public | Display version string |
-| `OCR_API_KEY` | Server (Phase 4) | OCR provider key |
+
 | `OPENAI_API_KEY` | Optional server-only | OpenAI grade explanation key |
 | `OPENAI_MODEL` | Optional server-only | OpenAI model ID |
 
@@ -330,11 +330,11 @@ npm run dev
 4. **Persisted methodology results** � Implemented as versioned `food.ProductGradingResult` rows
 5. **Replace mock scoring** in `page.tsx`, `featured-scan.tsx`, and `/scan/[id]/page.tsx` (not part of this task)
 
-### Phase 4 � OCR Label Extraction
+### Phase 4 — OCR label extraction (implemented; analysis integration deferred)
 
-6. **Enable file upload** � Activate the disabled file input in `ScanDropzone`
-7. **OCR API integration** � Send image to provider (Google Vision / Mistral OCR), parse response
-8. **Ingredient parser** � Extract ingredient list from OCR text; match to known ingredients or create new ones
+6. **Image upload** — JPEG, PNG, WebP; validates signatures and an 8 MB limit
+7. **Local OCR** — Tesseract.js 7 on Node/WebAssembly with cached English data
+8. **Editable parse** — raw OCR text plus unverified ingredient/nutrition draft; OCR-to-grading remains a later phase
 
 ### Phase 5 � AI Explanation Layer
 
@@ -365,7 +365,7 @@ The baseline migration `prisma/migrations/20261031090000_postgresql_foundation/m
 
 Counts reconcile with SQLite: Brand 6, Product 6, Ingredient 9, ProductIngredient 15, Nutrition 6, Claim 4, ProductClaim 4, Scan 6; PostgreSQL additionally has 6 mapped categories and 2 mapped additives. PostgreSQL has 22 validated foreign keys and zero imported relationship orphans. `npx prisma migrate status` reports up to date. The original SQLite source and backup still share SHA-256 `B7E9B8CE8A99C7EB5D48AB7249EA2D69E153F5BE4F299B4E9908901078D6CEB6`.
 
-Checks recorded at this point include the additive salt migration, live OFF Nutella persistence twice, PostgreSQL record and relationship checks, Prisma validation/status, 14 ingestion tests, TypeScript, lint, production build, and `git diff --check`. Barcode persistence and internal API retrieval are verified. The current grading engine and product UI are documented above; Phase 5 AI explanations are recorded in the 2026-11-08 update below. Keep OCR deferred.
+Checks recorded at this point include the additive salt migration, live OFF Nutella persistence twice, PostgreSQL record and relationship checks, Prisma validation/status, 14 ingestion tests, TypeScript, lint, production build, and `git diff --check`. Barcode persistence and internal API retrieval are verified. The current grading engine and product UI are documented above; Phase 5 AI explanations are recorded in the 2026-11-08 update below. OCR extraction is implemented; OCR-to-grading remains deferred to the next phase.
 
 ## AI grade explanations (2026-11-08)
 
@@ -375,3 +375,13 @@ Checks recorded at this point include the additive salt migration, live OFF Nute
 - No OpenAI credentials are configured locally, so no live provider request or generated text was claimed. Mock tests cover successful generation, reuse/versioning, configuration absence, insufficient data, provider/rate/timeout/invalid responses and grade immutability. Local PostgreSQL container was verified healthy and Prisma migration status is up to date.
 - Checks: Prisma generate/validate, 37 tests, TypeScript, ESLint, production build, migration status, Docker health and `git diff --check`.
 - Remaining limitation: explanation generation requires a valid OpenAI API key and model configured in the server environment. Provider output remains constrained and validated but is still generated text.
+
+## Food label OCR extraction (Phase 6, 2026-11-08)
+
+- Selected Tesseract.js 7: local Node.js/WebAssembly OCR, with no paid OCR provider or separate service. English trained data is downloaded and cached on first engine use; that initial use needs outbound access.
+- Added `POST /api/ocr` with multipart `image` field, Node runtime, 8 MB limit, JPEG/PNG/WebP MIME and signature checks, empty/invalid file errors, and no image persistence. OCR failures and no-text results return clear client errors.
+- `src/features/analysis/food-label-parser.ts` preserves raw text and line breaks, parses an ingredient line and ordered items, and best-effort nutrition fields. Supported nutrients: energy, total/saturated/trans fat, carbohydrates, total sugars, fiber, protein, sodium, and salt. Energy converts kJ to kcal; mass units convert mg/g where relevant; sodium and salt stay separate. Decimal comma is accepted; `<` values, negative values, unsupported units, and missing fields stay null.
+- The scan-page review shows read-only raw OCR text, an editable ingredient list and nutrient fields, source line snippets, explicit basis, warnings and unverified status. Edits are marked “User corrected” and remain in local review state only. No product creation or grading integration is included in this phase.
+- Actual OCR smoke check: Tesseract read an in-memory synthetic high-contrast label image and extracted its ingredient line, basis, energy, protein and sodium lines. This is not a representative camera/photo accuracy evaluation. Automated upload/parser tests mock the OCR worker and cover validation, no-text/errors, parser units, nulls, and salt-versus-sodium.
+- Verification: 47 tests pass; TypeScript, ESLint, production build, and `git diff --check` pass.
+- Limitations: English only; low-resolution, rotated, multilingual, curved/reflective packaging and complex nutrition tables may be inaccurate. Confirm all values manually. Output is not persisted or used by grading until the next phase.

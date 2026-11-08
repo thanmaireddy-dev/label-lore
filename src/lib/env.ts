@@ -37,14 +37,6 @@ export const serverEnv = {
     return requireEnv("DATABASE_URL");
   },
 
-  /**
-   * Phase 4: API key for the OCR provider (e.g. Google Vision, Mistral OCR).
-   * Provider TBD when Phase 4 begins.
-   */
-  get ocrApiKey() {
-    return requireEnv("OCR_API_KEY");
-  },
-
   /** Optional server-side OpenAI configuration. Missing values disable explanations gracefully. */
   get openAiApiKey() {
     return process.env.OPENAI_API_KEY?.trim() || null;

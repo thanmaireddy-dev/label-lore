@@ -1,6 +1,6 @@
 # CODEX_HANDOFF.md — Instructions for the Next Coding Agent
 
-> **Current update (2026-11-08):** PostgreSQL setup, legacy transfer, OFF persistence, normalization, deterministic grading, UI integration, and Phase 5 AI grade explanations are verified. Explanation generation is optional and requires server-only `OPENAI_API_KEY` and `OPENAI_MODEL`; local values are absent, so provider calls are mock-tested only. The grade remains persisted deterministic data. Prisma reports migrations up to date, and the original SQLite file and backup remain preserved.
+> **Current update (2026-11-08):** PostgreSQL setup, legacy transfer, OFF persistence, normalization, deterministic grading, UI integration, and Phase 5 AI grade explanations and Phase 6 local food-label OCR are implemented. OCR uses Tesseract.js and returns editable, unverified drafts without persisting them. No OpenAI credentials are configured, so provider calls remain mock-tested only. Prisma reports migrations up to date, and the original SQLite file and backup remain preserved.
 
 
 ## Read These First
@@ -15,7 +15,7 @@
 - **Inspect before editing.** Read the relevant source file before changing anything. The actual code may differ from this document.
 - **Preserve the architecture.** Features are organised as service classes in `src/features/`. API routes delegate to these services. Do not collapse service methods into route handlers.
 - **Use existing primitives.** UI components (Button, Card, StatusPill), design tokens (globals.css), and animation presets (lib/animations.ts) already exist. Use them.
-- **Do not assume planned features are implemented.** Persisted scoring and AI grade explanations are implemented; OCR, history, and insights remain incomplete.
+- **Do not assume planned features are implemented.** Persisted scoring and AI grade explanations are implemented; OCR extraction is implemented; history and insights remain incomplete.
 - **Do not restart or rewrite.** The existing data layer, API routes, and UI are working. Build on them.
 
 ---
@@ -23,7 +23,7 @@
 ## Current Capabilities (Working)
 
 - Product and scan data stored in PostgreSQL using `food` and `app` schemas
-- REST API includes products, scans, barcode ingestion, and `GET|POST /api/products/[id]/grade`
+- REST API includes products, scans, barcode ingestion, `POST /api/ocr`, and persisted grade/explanation endpoints
 - Home page renders real data from DB (server component)
 - Product detail page at `/scan/[id]` with nutrition, ingredients, claims
 - Search widget (debounced, live dropdown) in hero and /scan page
@@ -37,7 +37,7 @@
 | Feature | Status |
 |---|---|
 | Deterministic scoring engine and persisted UI integration | Implemented; see `docs/GRADING_METHODOLOGY.md` |
-| OCR image upload | UI placeholder only (input is disabled) |
+| Food-label OCR | Implemented with local Tesseract.js and editable unverified drafts |
 | AI grade explanations | Implemented; optional OpenAI config required for generation |
 | /history page | Route exists in nav but no page file |
 | /insights page | Route exists in nav but no page file |
@@ -59,12 +59,11 @@
 - Fetch `ScanService.getAllScans()` (already implemented)
 - Display scans in a list/grid with product name, brand, grade, timestamp
 
-### 3. Enable OCR upload (Phase 4)
+### 3. Food-label OCR (Phase 6, implemented)
 
-- Remove `disabled` from the file input in `src/components/hero/scan-dropzone.tsx`
-- Create `src/app/api/ocr/route.ts` � POST handler that accepts image, calls OCR provider, returns parsed ingredient text
-- Create `src/features/analysis/ingredient-parser.ts` � Parse OCR text into ingredient list
-- Requires: `OCR_API_KEY` environment variable
+- `POST /api/ocr` and `FoodLabelUpload` are implemented.
+- Tesseract.js runs locally in the Node.js route; English trained data downloads and caches on first use.
+- Supports JPEG, PNG and WebP up to 8 MB; output stays unverified and is not sent to grading.
 
 ### 4. AI grade explanations (Phase 5, implemented)
 
@@ -82,7 +81,7 @@
 
 ## Remaining product work
 
-OCR, history/insights routes, and authentication remain deferred. AI explanation generation is implemented but requires optional provider credentials. Do not add ingredient hazard classifications from INS codes alone; the current additive references contain identity/function fields but no verified hazard status.
+OCR extraction is implemented; OCR-to-grading, history/insights routes, and authentication remain deferred. AI explanation generation is implemented but requires optional provider credentials. Do not add ingredient hazard classifications from INS codes alone; the current additive references contain identity/function fields but no verified hazard status.
 
 ---
 
@@ -128,7 +127,7 @@ Ingredient normalization preserves OFF source text, order, repeated entries, and
 
 The current grading method is `label-lore-npm2004-adapted-v1`, documented in `docs/GRADING_METHODOLOGY.md`. It requires complete `100g` energy, saturated fat, total sugars, and sodium or salt data. Nutella persists as D/35 with transparent nutrient factors; two calculations update the same `(productId, methodologyVersion)` row. `POST /api/products/[id]/grade` exposes that calculation. Ingredient/additive references do not alter points because their hazard status is unverified; 100ml-only products remain ungraded without a density conversion. The method is a project heuristic and is not an FSSAI rating.
 
-The grading core, product grading UI, and AI explanation flow are implemented. Keep OCR and GS1 DataKart integration deferred.
+The grading core, product grading UI, and AI explanation flow are implemented. Keep OCR-to-grading and GS1 DataKart integration deferred.
 
 ## Product grading UI integration (2026-11-01)
 
@@ -145,3 +144,12 @@ Phase 5 is implemented in `src/features/analysis/` and `src/app/api/products/[id
 `GET` returns saved text or a no-call status/fallback; `POST` is the explicit generation action. Products with `INSUFFICIENT_DATA` always get deterministic text and no provider call. The detail panel labels AI text, shows configuration/loading/error states and supports retry. Set both OpenAI variables in the private environment to enable generation. The current local environment has no configured key/model, so the live OpenAI service was not called. Provider behavior is mocked in tests. Local PostgreSQL is healthy; migration status reports four migrations and up to date.
 
 Checks completed: Prisma client generate and schema validate; all 37 feature tests; TypeScript; ESLint; production build; migration status; Docker container health; `git diff --check`. Do not claim live model verification until a configured provider call is deliberately made.
+
+
+## Food label OCR extraction (Phase 6, 2026-11-08)
+
+`POST /api/ocr` accepts multipart field `image` and validates JPEG/PNG/WebP signatures and an 8 MB maximum. It uses Tesseract.js 7 in Node with the English model, returns raw text and a best-effort editable parse, and does not save uploaded image bytes. English trained data downloads/caches at first use; README documents this first-run network requirement. The parser keeps absent/invalid values null and distinguishes sodium from salt. All output is explicitly unverified; no product persistence or grading integration is included.
+
+The upload/review UI is `src/components/hero/food-label-upload.tsx`, embedded in `src/components/hero/scan-dropzone.tsx`. Raw text is read-only; parsed ingredient/nutrition values can be corrected and edits are marked in the UI. Corrections remain client-side for this phase.
+
+Verification: 47 tests pass; TypeScript, ESLint, production build, and `git diff --check` pass. The local Tesseract worker successfully read an in-memory synthetic high-contrast nutrition label (not a representative camera image).

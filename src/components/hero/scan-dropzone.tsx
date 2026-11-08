@@ -1,11 +1,12 @@
 "use client";
 
-import { Camera, Search, Loader2 } from "lucide-react";
+import { Search, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { ProductSummary } from "@/features/products/product.types";
 import { ProductGrade } from "@/components/analysis/product-grade";
+import { FoodLabelUpload } from "./food-label-upload";
 
 interface ScanDropzoneProps {
   className?: string;
@@ -58,32 +59,7 @@ export function ScanDropzone({ className }: ScanDropzoneProps) {
 
   return (
     <div className={cn("w-full max-w-xl", className)}>
-      {/* Main dropzone area */}
-      <div className="group relative cursor-pointer rounded-2xl border-2 border-dashed border-border bg-surface/60 px-6 py-8 text-center backdrop-blur-sm transition-all duration-200 hover:border-primary/40 hover:bg-surface/80">
-        <div className="flex flex-col items-center gap-3">
-          <div className="inline-flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary transition-transform duration-200 group-hover:scale-105">
-            <Camera className="size-6" strokeWidth={1.5} />
-          </div>
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-foreground">
-              Drop a label photo or click to upload
-            </p>
-            <p className="text-xs text-foreground-muted">
-              (OCR functionality coming in Phase 4)
-            </p>
-          </div>
-        </div>
-
-        {/* Hidden file input — visual only for now */}
-        <input
-          type="file"
-          className="absolute inset-0 cursor-pointer opacity-0"
-          accept="image/*"
-          aria-label="Upload a food label photo"
-          tabIndex={-1}
-          disabled
-        />
-      </div>
+      <FoodLabelUpload />
 
       {/* Separator */}
       <div className="flex items-center gap-3 py-3">
