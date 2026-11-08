@@ -45,12 +45,13 @@ export const serverEnv = {
     return requireEnv("OCR_API_KEY");
   },
 
-  /**
-   * Phase 5: API key for the LLM provider (e.g. Google Gemini, OpenAI).
-   * The AI module will use this — never expose it client-side.
-   */
-  get aiApiKey() {
-    return requireEnv("AI_API_KEY");
+  /** Optional server-side OpenAI configuration. Missing values disable explanations gracefully. */
+  get openAiApiKey() {
+    return process.env.OPENAI_API_KEY?.trim() || null;
+  },
+
+  get openAiModel() {
+    return process.env.OPENAI_MODEL?.trim() || null;
   },
 } as const;
 

@@ -1,9 +1,9 @@
 # PROJECT_STATUS.md — Label Reader Handoff Report
 
-> **Current update (2026-11-01):** The deterministic grading engine is persisted and integrated into product search, featured and recent product cards, and product detail analysis. Displays use `GET /api/products/[id]/grade` and show the current methodology result, with a real insufficient-data state when required values are missing. Nutella renders 35/D with nutrient factor details. No production product display uses mock grades or ingredient safety labels. See the grading methodology and Product grading UI integration section below.
+> **Current update (2026-11-08):** The persisted deterministic grading engine and product UI integration remain verified. Phase 5 AI grade explanations are now implemented with optional server-side OpenAI configuration, persisted prompt/methodology versions, deterministic insufficient-data responses, and a detail-page panel. No live OpenAI call was made because credentials are absent.
 
 
-_Last updated: 2026-11-01 | Phase: persisted grading experience integrated_
+_Last updated: 2026-11-08 | Phase: persisted grading and explanation experience_
 
 ## Phase 2B update (2026-10-31)
 
@@ -52,7 +52,7 @@ _Last updated: 2026-11-01 | Phase: persisted grading experience integrated_
 
 Label Reader is a Next.js web application that helps Indian consumers decode food product labels. It displays ingredient analysis, nutrition facts, and marketing claims for packaged Indian food products.
 
-**Historical state at handoff:** Phase 2 used Prisma + SQLite and the UI displayed placeholder scores. The backend now has a deterministic grading engine and persisted results; UI score displays remain placeholders. OCR and AI explanations remain out of scope.
+**Historical note:** Earlier handoff snapshots described placeholder score displays. The grading engine and UI integration are now complete; AI grade explanations are implemented in the 2026-11-08 update. OCR remains out of scope.
 
 ---
 
@@ -232,7 +232,7 @@ Key design decisions:
 | **History page** (`/history`) | 404 | Nav link exists, page does not |
 | **Insights page** (`/insights`) | 404 | Nav link exists, page does not |
 | **Authentication** | Not started | User icon visible but non-functional (cursor-not-allowed) |
-| **AI explanations** | Not started | Phase 5 |
+| **AI explanations** | Implemented; optional OpenAI config | Phase 5 |
 | **Product comparison** | Not started | Phase 5+ |
 | **Claim verification** | Partial | Claims displayed; no verification logic |
 | **Ingredient descriptions** | Partial | `description` field in schema but seed data doesn't populate it |
@@ -292,7 +292,8 @@ All checks run on 2026-10-26:
 | `NEXT_PUBLIC_SITE_URL` | Public | Base URL for metadata |
 | `NEXT_PUBLIC_APP_VERSION` | Public | Display version string |
 | `OCR_API_KEY` | Server (Phase 4) | OCR provider key |
-| `AI_API_KEY` | Server (Phase 5) | LLM provider key |
+| `OPENAI_API_KEY` | Optional server-only | OpenAI grade explanation key |
+| `OPENAI_MODEL` | Optional server-only | OpenAI model ID |
 
 ---
 
@@ -364,4 +365,13 @@ The baseline migration `prisma/migrations/20261031090000_postgresql_foundation/m
 
 Counts reconcile with SQLite: Brand 6, Product 6, Ingredient 9, ProductIngredient 15, Nutrition 6, Claim 4, ProductClaim 4, Scan 6; PostgreSQL additionally has 6 mapped categories and 2 mapped additives. PostgreSQL has 22 validated foreign keys and zero imported relationship orphans. `npx prisma migrate status` reports up to date. The original SQLite source and backup still share SHA-256 `B7E9B8CE8A99C7EB5D48AB7249EA2D69E153F5BE4F299B4E9908901078D6CEB6`.
 
-Checks recorded at this point include the additive salt migration, live OFF Nutella persistence twice, PostgreSQL record and relationship checks, Prisma validation/status, 14 ingestion tests, TypeScript, lint, production build, and `git diff --check`. Barcode persistence and internal API retrieval are verified. The current grading engine, migration, API test, and 23-test run are documented in the 2026-11-01 section above. Keep OCR and AI deferred.
+Checks recorded at this point include the additive salt migration, live OFF Nutella persistence twice, PostgreSQL record and relationship checks, Prisma validation/status, 14 ingestion tests, TypeScript, lint, production build, and `git diff --check`. Barcode persistence and internal API retrieval are verified. The current grading engine and product UI are documented above; Phase 5 AI explanations are recorded in the 2026-11-08 update below. Keep OCR deferred.
+
+## AI grade explanations (2026-11-08)
+
+- Added versioned `food.ProductGradeExplanation` persistence, keyed by product, grading methodology and prompt version. Migration `20261108120000_product_grade_explanations` is applied; Prisma reports all four migrations up to date.
+- Added `GET|POST /api/products/{id}/explanation` and a detail-page panel. GET reuses stored text or returns deterministic insufficient-data/configuration states; POST generates only for a persisted graded result when both OpenAI variables are configured. The UI identifies AI-generated text and provides loading, error and retry states.
+- The direct Responses API client uses strict JSON output, `store: false`, a 15-second timeout, instruction-safe treatment of product and ingredient strings, and validation against numeric values, grade changes, and unsupported medical/toxicity/health claims. It supplies persisted factors and completeness/verification metadata; it does not modify grading.
+- No OpenAI credentials are configured locally, so no live provider request or generated text was claimed. Mock tests cover successful generation, reuse/versioning, configuration absence, insufficient data, provider/rate/timeout/invalid responses and grade immutability. Local PostgreSQL container was verified healthy and Prisma migration status is up to date.
+- Checks: Prisma generate/validate, 37 tests, TypeScript, ESLint, production build, migration status, Docker health and `git diff --check`.
+- Remaining limitation: explanation generation requires a valid OpenAI API key and model configured in the server environment. Provider output remains constrained and validated but is still generated text.

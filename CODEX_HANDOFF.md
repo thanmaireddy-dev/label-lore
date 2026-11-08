@@ -1,6 +1,6 @@
 # CODEX_HANDOFF.md — Instructions for the Next Coding Agent
 
-> **Current update (2026-11-01):** PostgreSQL setup, legacy transfer, OFF persistence, normalization, deterministic grading, and the product UI integration are verified. Product grade cards and analysis panels load the saved result for `label-lore-npm2004-adapted-v1` through `GET /api/products/[id]/grade`; a missing current-version row is calculated and version-upserted. Nutella renders D/35. Products without required values render Insufficient Data with the missing fields. Search, featured, recent, and detail displays no longer use mock grades, and ingredient/additive identity is separate from nutrient scoring. See `docs/GRADING_METHODOLOGY.md`. Prisma migrations are up to date, and the original SQLite file and backup remain preserved.
+> **Current update (2026-11-08):** PostgreSQL setup, legacy transfer, OFF persistence, normalization, deterministic grading, UI integration, and Phase 5 AI grade explanations are verified. Explanation generation is optional and requires server-only `OPENAI_API_KEY` and `OPENAI_MODEL`; local values are absent, so provider calls are mock-tested only. The grade remains persisted deterministic data. Prisma reports migrations up to date, and the original SQLite file and backup remain preserved.
 
 
 ## Read These First
@@ -15,7 +15,7 @@
 - **Inspect before editing.** Read the relevant source file before changing anything. The actual code may differ from this document.
 - **Preserve the architecture.** Features are organised as service classes in `src/features/`. API routes delegate to these services. Do not collapse service methods into route handlers.
 - **Use existing primitives.** UI components (Button, Card, StatusPill), design tokens (globals.css), and animation presets (lib/animations.ts) already exist. Use them.
-- **Do not assume planned features are implemented.** Scoring is implemented as a backend service; UI wiring, OCR, AI, history, and insights remain incomplete.
+- **Do not assume planned features are implemented.** Persisted scoring and AI grade explanations are implemented; OCR, history, and insights remain incomplete.
 - **Do not restart or rewrite.** The existing data layer, API routes, and UI are working. Build on them.
 
 ---
@@ -38,7 +38,7 @@
 |---|---|
 | Deterministic scoring engine and persisted UI integration | Implemented; see `docs/GRADING_METHODOLOGY.md` |
 | OCR image upload | UI placeholder only (input is disabled) |
-| AI/LLM explanations | NOT started |
+| AI grade explanations | Implemented; optional OpenAI config required for generation |
 | /history page | Route exists in nav but no page file |
 | /insights page | Route exists in nav but no page file |
 | Authentication | Not started |
@@ -66,11 +66,11 @@
 - Create `src/features/analysis/ingredient-parser.ts` � Parse OCR text into ingredient list
 - Requires: `OCR_API_KEY` environment variable
 
-### 4. Add AI explanations (Phase 5)
+### 4. AI grade explanations (Phase 5, implemented)
 
-- After Phase 3 scoring engine exists, add a POST route at `/api/analysis/explain`
+- Existing route: `GET|POST /api/products/[id]/explanation`; generation uses the persisted grade only.
 - Send `AnalysisResult` to LLM; return natural-language summary
-- Requires: `AI_API_KEY` environment variable
+- Requires `OPENAI_API_KEY` and `OPENAI_MODEL` in the private server environment.
 
 ### 5. Migrate to PostgreSQL for production
 
@@ -82,7 +82,7 @@
 
 ## Remaining product work
 
-OCR, AI explanations, history/insights routes, and authentication remain deferred. Do not add ingredient hazard classifications from INS codes alone; the current additive references contain identity/function fields but no verified hazard status.
+OCR, history/insights routes, and authentication remain deferred. AI explanation generation is implemented but requires optional provider credentials. Do not add ingredient hazard classifications from INS codes alone; the current additive references contain identity/function fields but no verified hazard status.
 
 ---
 
@@ -128,7 +128,7 @@ Ingredient normalization preserves OFF source text, order, repeated entries, and
 
 The current grading method is `label-lore-npm2004-adapted-v1`, documented in `docs/GRADING_METHODOLOGY.md`. It requires complete `100g` energy, saturated fat, total sugars, and sodium or salt data. Nutella persists as D/35 with transparent nutrient factors; two calculations update the same `(productId, methodologyVersion)` row. `POST /api/products/[id]/grade` exposes that calculation. Ingredient/additive references do not alter points because their hazard status is unverified; 100ml-only products remain ungraded without a density conversion. The method is a project heuristic and is not an FSSAI rating.
 
-The grading core and product grading UI are implemented. Keep OCR, AI explanations, and GS1 DataKart integration deferred.
+The grading core, product grading UI, and AI explanation flow are implemented. Keep OCR and GS1 DataKart integration deferred.
 
 ## Product grading UI integration (2026-11-01)
 
@@ -137,3 +137,11 @@ The grade API now supports GET as a current-method read-or-generate operation. I
 `src/components/analysis/product-grade.tsx` validates API responses with the shared Zod contract, deduplicates simultaneous requests and caches successful/in-flight responses briefly. It renders grade/score, persisted factor values and points, completeness, verification, uncertainty, method version, and calculation time. Insufficient results never display a grade or score. The panel has loading, error/retry, and not-found states. Compact product search, featured, and recent scan results use the same grade component. Ingredient/additive display is neutral identity evidence; no INS-based warning is generated.
 
 Verification on 2026-11-01: production API GET returned Nutella D/35 with the current methodology; missing grades generated and repeat GET reused the same calculation timestamp; two parallel first-time GETs both received the same result/timestamp; a nonexistent product returned 404. PostgreSQL currently has three current-version grading rows (one `GRADED`, two `INSUFFICIENT_DATA`). The Nutella detail page was inspected in the browser. 26 tests pass, including three API-response contract tests. TypeScript, lint, Prisma validation, and `git diff --check` pass. `npx prisma migrate status` reports up to date. The `build` script uses Next.js's supported `--webpack` mode because Turbopack panicked while launching its CSS worker; `npm run build` succeeds with this setting.
+
+## AI grade explanation implementation (2026-11-08)
+
+Phase 5 is implemented in `src/features/analysis/` and `src/app/api/products/[id]/explanation/route.ts`. The private OpenAI Responses API client uses `OPENAI_API_KEY` and `OPENAI_MODEL` via typed server environment config, strict structured output, non-stored provider requests, a timeout, and output validation. It passes persisted grade factors and data completeness/verification; grade calculation remains deterministic and separate. `food.ProductGradeExplanation` stores one explanation per product + methodology version + prompt version. The additive migration is `20261108120000_product_grade_explanations`.
+
+`GET` returns saved text or a no-call status/fallback; `POST` is the explicit generation action. Products with `INSUFFICIENT_DATA` always get deterministic text and no provider call. The detail panel labels AI text, shows configuration/loading/error states and supports retry. Set both OpenAI variables in the private environment to enable generation. The current local environment has no configured key/model, so the live OpenAI service was not called. Provider behavior is mocked in tests. Local PostgreSQL is healthy; migration status reports four migrations and up to date.
+
+Checks completed: Prisma client generate and schema validate; all 37 feature tests; TypeScript; ESLint; production build; migration status; Docker container health; `git diff --check`. Do not claim live model verification until a configured provider call is deliberately made.

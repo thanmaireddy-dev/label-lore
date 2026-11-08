@@ -257,9 +257,25 @@ model ProductGradingResult {
   dataCompleteness   Json
   calculatedAt       DateTime @default(now())
   product            Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  explanations       ProductGradeExplanation[]
 
   @@unique([productId, methodologyVersion])
   @@index([calculatedAt])
+  @@schema("food")
+}
+
+model ProductGradeExplanation {
+  id                 String               @id @default(cuid())
+  productId          String
+  methodologyVersion String
+  promptVersion      String
+  explanation        String
+  model              String
+  createdAt          DateTime             @default(now())
+  gradingResult      ProductGradingResult @relation(fields: [productId, methodologyVersion], references: [productId, methodologyVersion], onDelete: Cascade)
+
+  @@unique([productId, methodologyVersion, promptVersion])
+  @@index([productId])
   @@schema("food")
 }
 

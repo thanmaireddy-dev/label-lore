@@ -4,6 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { StatusPill } from "@/components/ui/status-pill";
 import { Flame, ShieldCheck, FileText, Beaker } from "lucide-react";
 import { ProductGrade } from "@/components/analysis/product-grade";
+import { GradeExplanation } from "@/components/analysis/grade-explanation";
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import Link from "next/link";
@@ -168,6 +169,8 @@ export default async function ScanResultPage({ params }: PageProps) {
               )}
             </CardContent>
           </Card>
+
+          <GradeExplanation productId={product.id} />
 
         </div>
       </div>
