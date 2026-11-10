@@ -193,6 +193,10 @@ export class ProductIngestionRepository {
           const existingNutrition = await tx.nutrition.findUnique({ where: { productId: product.id } });
           if (existingNutrition?.sourceRecordId === sourceRecord.id) await tx.nutrition.delete({ where: { id: existingNutrition.id } });
         }
+        // Grades and their explanations are derived from the persisted nutrition and
+        // ingredient records. A successful source refresh makes every saved version
+        // stale, so remove them in this transaction; the explanation FK cascades.
+        await tx.productGradingResult.deleteMany({ where: { productId: product.id } });
         const [ingredientCount, allergenCount, canonicalNutrition] = await Promise.all([
           tx.productIngredient.count({ where: { productId: product.id } }),
           tx.productAllergen.count({ where: { productId: product.id } }),

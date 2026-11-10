@@ -102,13 +102,17 @@ On `/scan`, name, brand, and category queries search products already in the loc
 
 Opening a product adds it to Recent products in this browser. `/history`, the home-page recent-products section, and the footer history link use browser `localStorage`; no anonymous search history is written to the shared database. Repeated views move a product to the top, the list keeps at most 20 products, and Clear history removes the browser-local list. Recent cards load the same persisted current-method grade shown on product detail pages. Unscoped legacy `/api/scans` endpoints return `410 HISTORY_NOT_AVAILABLE` instead of disclosing shared anonymous history.
 
+## Reliability status
+
+The development command uses Next.js 16's documented `--webpack` option because the default Turbopack dev server hit a Windows junction-point error in this environment. A successful Open Food Facts refresh invalidates persisted product grades and their saved explanations transactionally; subsequent reads recalculate from the latest stored inputs. This hardening pass passed 53 automated tests, Prisma validation and migration status, TypeScript, ESLint, and the production build. PostgreSQL readiness, both schemas, live Nutella retrieval, repeated barcode lookup, and local name/brand/category search were also verified. Browser click-through was unavailable in this environment, and no representative label-photo fixture was present, so those UI flows were not claimed as tested here. See [PROJECT_STATUS.md](PROJECT_STATUS.md) for the full verification record.
+
 ---
 
 ## Available Scripts
 
 | Command | Description |
 |---|---|
-| `npm run dev` | Start dev server with HMR |
+| `npm run dev` | Start dev server with HMR using Webpack |
 | `npm run build` | Production build |
 | `npm run start` | Start production server |
 | `npm run lint` | Run ESLint |
@@ -145,9 +149,11 @@ label-reader/
 �   +-- dev.db              # Preserved legacy SQLite database
 +-- src/
     +-- app/                # Next.js App Router
-    �   +-- api/products/   # GET /api/products, /[id], /search
-    �   +-- api/scans/      # GET|POST /api/scans, /[id], /recent
-    �   +-- scan/           # Scan page and /scan/[id] result page
+    �   +-- api/products/   # Catalog search, barcode lookup, details, grade, explanation
+    �   +-- api/ocr/        # OCR extraction, analysis, retrieval, explanation
+    �   +-- api/scans/      # Retired shared-anonymous history endpoints (410)
+    �   +-- history/        # Browser-local recent products
+    �   +-- scan/           # Search/OCR page and /scan/[id] product detail
     �   +-- layout.tsx      # Root layout (Navbar + Footer)
     �   +-- page.tsx        # Home page (server component, real data)
     +-- components/
@@ -158,8 +164,10 @@ label-reader/
     �   +-- ui/             # Button, Card, StatusPill primitives
     +-- config/site.ts      # Centralised site config
     +-- features/
+    �   +-- analysis/       # Grading, explanations, OCR parser and analysis services
+    �   +-- history/        # Browser-local recent product data
+    �   +-- ingestion/      # Open Food Facts normalization and persistence
     �   +-- products/       # ProductService + Prisma types
-    �   +-- scans/          # ScanService + Prisma types
     +-- lib/
     �   +-- animations.ts   # Framer Motion presets
     �   +-- env.ts          # Typed env var accessors

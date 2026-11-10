@@ -1,6 +1,6 @@
 # CODEX_HANDOFF.md — Instructions for the Next Coding Agent
 
-> **Current update (2026-11-10):** PostgreSQL setup, legacy transfer, OFF persistence, normalization, deterministic grading, product UI, AI grade explanations, local food-label OCR, OCR-to-grading, catalog/barcode search, and browser-local recent products are implemented. OCR analyses are standalone and unverified. OpenAI credentials are not configured; no live provider generation has been tested. Prisma reports migrations up to date; the original SQLite file and backup remain preserved.
+> **Current update (2026-11-10):** Phase 10 reliability review is complete. Successful Open Food Facts refreshes now invalidate persisted product grades and their cascading saved explanations in the same transaction, preventing stale derived results. The dev script uses Next.js 16's Webpack option after the default Turbopack server hit a Windows junction-point error. All 53 automated tests, Prisma validation/status, TypeScript, ESLint, and webpack production build pass. Docker PostgreSQL is healthy; schemas `app` and `food` exist. Live OFF retrieval and repeated Nutella lookup passed with stable counts (7 products, one GTIN). Browser click-through and real-image upload were not performed because localhost browser access was unavailable and the repo has no representative image fixture. OpenAI is unconfigured; SQLite and its backup remain preserved.
 
 
 ## Read These First
@@ -15,7 +15,7 @@
 - **Inspect before editing.** Read the relevant source file before changing anything. The actual code may differ from this document.
 - **Preserve the architecture.** Features are organised as service classes in `src/features/`. API routes delegate to these services. Do not collapse service methods into route handlers.
 - **Use existing primitives.** UI components (Button, Card, StatusPill), design tokens (globals.css), and animation presets (lib/animations.ts) already exist. Use them.
-- **Do not assume planned features are implemented.** Product history is browser-local in `/history`; `/insights` remains incomplete.
+- **Do not assume planned features are implemented.** Product history is browser-local in `/history`; authentication, Insights, and a newsletter backend remain out of scope.
 - **Do not restart or rewrite.** The existing data layer, API routes, and UI are working. Build on them.
 
 ---
@@ -32,7 +32,7 @@
 
 ---
 
-## What Is NOT Implemented
+## Feature Status
 
 | Feature | Status |
 |---|---|
@@ -40,14 +40,14 @@
 | Food-label OCR and grading | Implemented with local Tesseract.js, editable unverified drafts, standalone analysis persistence, existing deterministic scorer, and reused explanation service |
 | AI grade explanations | Implemented; optional OpenAI config required for generation |
 | /history page | Implemented with browser-local recent products and clear-history action |
-| /insights page | Route exists in nav but no page file |
+| Insights | Not implemented; no navigation link is present |
 | Authentication | Not started |
 | Newsletter backend | Form is UI-only |
 | Dark mode | Not started |
 
 ---
 
-## Recommended Next Steps (Prioritized)
+## Implemented Workflows and Follow-up Notes
 
 ### Grading engine and product experience (complete)
 
@@ -71,14 +71,6 @@
 - Existing route: `GET|POST /api/products/[id]/explanation`; generation uses the persisted grade only.
 - Send `AnalysisResult` to LLM; return natural-language summary
 - Requires `OPENAI_API_KEY` and `OPENAI_MODEL` in the private server environment.
-
-### 5. Migrate to PostgreSQL for production
-
-- Change `DATABASE_URL` to a Neon/Supabase PostgreSQL URL
-- Run `npx prisma migrate deploy`
-- This also fixes case-insensitive search (currently broken on SQLite)
-
----
 
 ## Remaining product work
 
