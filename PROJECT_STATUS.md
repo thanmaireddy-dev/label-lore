@@ -1,9 +1,9 @@
 # PROJECT_STATUS.md — Label Reader Handoff Report
 
-> **Current update (2026-11-10):** Phase 8 OCR-to-grading is implemented. Users can review extracted fields, submit them to the existing deterministic scorer, and retrieve a persisted unverified standalone label analysis. No fake Product/barcode is created.
+> **Current update (2026-11-10):** Phase 9 product discovery and user-facing navigation are implemented: local catalog search, submitted barcode lookup, product details, and browser-local recent product history. Phase 8 OCR-to-grading remains integrated as a standalone unverified analysis, not a branded product.
 
 
-_Last updated: 2026-11-10 | Phase: OCR analysis integrated with grading and explanations_
+_Last updated: 2026-11-10 | Phase: product discovery, local history, and connected OCR/product flows_
 
 ## Phase 2B update (2026-10-31)
 
@@ -78,7 +78,7 @@ src/
       scans/[id]/route.ts        � GET /api/scans/[id]
       scans/recent/route.ts      � GET /api/scans/recent
     scan/
-      page.tsx                   � /scan: search-only page
+      page.tsx                   � /scan: product/brand/category catalog search, barcode lookup, and OCR analysis
       [id]/page.tsx              � /scan/[id]: full product analysis page
 
   components/
@@ -143,20 +143,19 @@ src/
 
 ```
 Browser ? Next.js Server Component (page.tsx)
-           ? ProductService.getAllProducts() / ScanService.getRecentScans()
-             ? Prisma ? SQLite (dev) / PostgreSQL (prod)
-           ? Renders HTML with real data
+           ? ProductService.getAllProducts()
+             ? Prisma ? PostgreSQL (`food` + `app`)
+           ? Renders HTML with real product data and browser-local recent history
 
 Browser ? Client Component (ScanDropzone)
-           ? fetch('/api/products/search?q=...')
-             ? Route Handler ? ProductService.searchProducts()
-               ? Prisma ? DB
-           ? Renders dropdown
+           ? Name/brand/category: GET /api/products/search?q=... (local catalog)
+           ? Barcode submit: GET /api/products/by-barcode/[barcode] (Open Food Facts, then PostgreSQL)
+           ? Renders matches/errors and opens persisted product detail
 
 Browser ? /scan/[id]
            ? Server Component fetches ProductService.getProductById(id)
            ? Falls back: ScanService.getScanById(id) ? then product lookup
-           ? Calls ScanService.createScan() fire-and-forget to record visit
+           ? Client tracker writes product visit to this browser's localStorage
            ? Renders full product analysis page
 ```
 
@@ -174,7 +173,7 @@ Key design decisions:
 - `Scan.productId` is nullable (future: OCR scans before product is matched)
 - Cascade deletes on all product-dependent tables
 
-**One migration:** `20261003215840_init` � initial full schema.
+**Current database:** PostgreSQL 16 with five applied Prisma migrations across `app` and `food`; the initial SQLite DB and backup remain preserved.
 
 **Seed data (6 products):**
 - Maggi Masala Noodles (Nestl�) � MSG, palm oil
@@ -192,12 +191,17 @@ Key design decisions:
 |---|---|---|
 | GET | `/api/products` | List all products. `?limit=N` (default 50, max 100) |
 | GET | `/api/products/[id]` | Single product with brand, ingredients, nutrition, claims |
-| POST | `/api/products/[id]/grade` | Calculate and persist the current versioned deterministic grade |
+| GET / POST | `/api/products/[id]/grade` | Read/currently calculate or recalculate the persisted deterministic grade |
 | GET | `/api/products/search` | Search by name/brand/category. `?q=query` |
-| GET | `/api/scans` | List all scans with product. `?limit=N` |
-| POST | `/api/scans` | Create scan. Body: `{ productId, source?: "manual"|"ocr" }` |
-| GET | `/api/scans/[id]` | Single scan with product + brand |
-| GET | `/api/scans/recent` | 10 most-recent scans with product + brand |
+| GET | `/api/products/by-barcode/[barcode]` | Open Food Facts lookup and product persistence |
+| GET / POST | `/api/scans` | 410 `HISTORY_NOT_AVAILABLE`; anonymous history is browser-local |
+| GET | `/api/scans/[id]` | 410 `HISTORY_NOT_AVAILABLE` |
+| GET | `/api/scans/recent` | 410 `HISTORY_NOT_AVAILABLE` |
+| POST | `/api/ocr` | Extract unverified text from a label image |
+| POST | `/api/ocr/analyses` | Persist a validated standalone reviewed OCR analysis |
+| GET | `/api/ocr/analyses/[id]` | Retrieve standalone OCR analysis |
+| GET / POST | `/api/ocr/analyses/[id]/explanation` | Existing explanation service for persisted OCR analysis |
+| GET / POST | `/api/products/[id]/explanation` | Load or generate explanation for the persisted product grade |
 
 **Response shape (all routes):**
 - Success: `{ data: ... }` or `{ data: ..., count: N }`
@@ -207,12 +211,11 @@ Key design decisions:
 
 ## 7. Implemented Features
 
-- **Home page** (server-rendered) with hero, featured product card, how-it-works steps, recent scans carousel, CTA banner, newsletter form (UI only)
-- **Product search** � debounced text search in `ScanDropzone`, hitting `/api/products/search`, results shown in dropdown, click navigates to `/scan/[id]`
+- **Home page** (server-rendered) with hero, featured product card, how-it-works steps, browser-local recent products, CTA banner, newsletter form (UI only)
+- **Product search** � local catalog name/brand/category suggestions plus submitted Open Food Facts barcode lookup; results navigate to `/scan/[id]`
 - **Product detail page** (`/scan/[id]`) � shows product info, API-backed grade and factor breakdown, nutrition facts, neutral ingredient/additive evidence, and marketing claims
 - **Deterministic product grading** � pure `scoreProduct()` engine, persisted `ProductGradingResult`, and `GET|POST /api/products/[id]/grade`; product views use the current-version persisted result
-- **Scan recording** � every visit to `/scan/[id]` fires `ScanService.createScan()` to record a scan event
-- **Recent scans carousel** � horizontal scroll with snap, prev/next buttons, live scroll-state tracking
+- **Recent products** � browser-local views with grade cards, reopen links, max 20, and clear action
 - **Featured scan section** � first product from DB with persisted grade state and source nutrition strip
 - **Navbar** � sticky, blur-on-scroll, mobile slide-out menu, all links wired
 - **Footer** � 4-column with product, resources, legal columns (most links marked coming soon)
@@ -227,20 +230,22 @@ Key design decisions:
 |---|---|---|
 | **Grading display** | Implemented | Current-version persisted results across search, featured, recent, and detail views |
 | **OCR upload and analysis** | Implemented | Local Tesseract.js, editable unverified review, server-side grading and standalone persistence |
+| **Catalog and barcode search** | Implemented | Catalog search by product/brand/category; submitted barcodes use Open Food Facts |
+| **Recent products** | Implemented | Browser `localStorage`, deduplicated, max 20, clear action; no cross-user DB history |
 | **Newsletter** | UI only | Form renders; no backend submit handler |
 | **Dark mode toggle** | Not started | Sun/Moon icons removed (unused). Design tokens are light-only |
-| **History page** (`/history`) | 404 | Nav link exists, page does not |
+| **History page** (`/history`) | Implemented | Browser-local recent products; clears without server history |
 | **Insights page** (`/insights`) | 404 | Nav link exists, page does not |
 | **Authentication** | Not started | User icon visible but non-functional (cursor-not-allowed) |
 | **AI explanations** | Implemented; optional OpenAI config | Phase 5 |
 | **Product comparison** | Not started | Phase 5+ |
 | **Claim verification** | Partial | Claims displayed; no verification logic |
 | **Ingredient descriptions** | Partial | `description` field in schema but seed data doesn't populate it |
-| **`/api/products` � mode=insensitive** | SQLite limitation | `contains` is case-sensitive on SQLite; would be case-insensitive on PostgreSQL |
+| **Name matching** | Implemented | Active PostgreSQL search uses case-insensitive matching; legacy SQLite is not the active datasource |
 
 ---
 
-## 9. Verification Results
+## 9. Initial verification snapshot (2026-10-26; superseded by dated phase updates below)
 
 All checks run on 2026-10-26:
 
@@ -264,23 +269,14 @@ All checks run on 2026-10-26:
 
 ---
 
-## 10. Known Bugs, Technical Debt & Decisions
+## 10. Current limitations and decisions (2026-11-10)
 
-1. **Case-sensitive SQLite search** � `ProductService.searchProducts` uses `contains` which is case-insensitive on PostgreSQL but case-sensitive on SQLite. Upgrading to PostgreSQL for production resolves this; for SQLite dev, consider using `mode: 'insensitive'` which Prisma silently ignores on SQLite.
-
-2. **Mock scoring UI** � The home and product detail displays still show the old placeholder score. The deterministic grading service and API now exist but have not been wired into those views.
-
-3. **Fire-and-forget scan creation** � `/scan/[id]` calls `ScanService.createScan()` with `.catch(() => {})`. Failures are silently swallowed. Acceptable for Phase 2; Phase 3+ should log errors.
-
-4. **No pagination UI** � API supports `limit` param but no "Load More" UI exists.
-
-5. **`src/types/index.ts` vs feature types** � Two separate type layers exist: domain types (`types/index.ts`) and Prisma-derived types (`features/*/product.types.ts`, `scan.service.ts`). The domain types are Phase 3 stubs; components use the Prisma types.
-
-6. **No tests** � No unit or integration tests exist. The project relies on TypeScript and manual verification.
-
-7. **`LayoutProps<"/">` in layout.tsx** � Next.js 16 provides this type for App Router layouts; it's part of the new API, not a custom type.
-
-8. **`next.config.ts` is minimal** � No image domains, no rewrites, no redirects configured yet.
+1. Anonymous recent products stay in the browser profile. They do not sync across devices or accounts and may be removed when browser storage is cleared.
+2. The local catalog search is by product name, brand, or category. External lookup by name is not implemented; barcode lookup uses Open Food Facts.
+3. English OCR is best effort; users must check extracted fields. Reviewed OCR data stays unverified, and current grading requires supported per-100g values.
+4. AI explanation generation requires optional OpenAI configuration. No live OpenAI call was made in this verification.
+5. The `/insights` route is still not implemented and is not linked in the main navbar. Search and product detail, browser-local history, and OCR are connected.
+6. The database Scan and SearchEvent models remain for possible future scoped use, but this anonymous experience does not write to them. Unscoped scan-history APIs return 410 to avoid exposing shared events. Existing rows were not deleted.
 
 ---
 
@@ -343,8 +339,8 @@ npm run dev
 
 ### Phase 6 � Product & UX
 
-11. **History page** � List user scan history (currently a 404)
-12. **Insights page** � Aggregate insights across scans
+11. **History page** � Implemented at `/history` with browser-local recent products and a clear-history action
+12. **Insights page** � Aggregate insights across products (deferred)
 13. **Product comparison** � Side-by-side comparison of two products
 14. **Better alternatives** � Suggest lower-risk alternatives in the same category
 15. **Dark mode** � Design tokens already support overrides; just needs a second `:root[data-theme="dark"]` block
@@ -395,3 +391,15 @@ Historical verification snapshot before the OCR-to-grading phase: checks include
 - Real database verification: local PostgreSQL accepted a temporary valid submission and returned grade A; retrieval returned the same row; repeated submission reused its ID and left one row for that submission key. The explanation service returned `NOT_CONFIGURED` because no key is set. The test row was deleted. Prisma reports all five migrations up to date. Existing Nutella persistence, barcode normalization tests, and product explanation tests continue to pass.
 - Automated verification: all 51 tests pass, including OCR service valid/insufficient/malicious-payload/idempotency cases and existing barcode grading tests. `npx prisma validate`, `npx prisma migrate status` (five migrations, up to date), `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check` pass. The first sandboxed build attempt could not reach configured Google Fonts; the production build passed with network access enabled.
 - Limitations: OCR is English and best effort; users must review values. Current grading supports 100g basis only; 100ml without a valid density conversion is insufficient. No live OpenAI generation was tested because credentials are not configured.
+
+## Product discovery and user-facing workflows (Phase 9, 2026-11-10)
+
+- `/scan` and the home search now distinguish two supported paths: product/brand/category matching against the existing local catalog, and an explicit 8–14 digit barcode submission to the existing Open Food Facts persistence route. Name search is not represented as an Open Food Facts lookup. Empty, invalid, missing, incomplete-source, rate-limited, and upstream-failure states have clear user messages.
+- Successful barcode lookup navigates to `/scan/{productId}`. Product detail links back to the search/scan flow and shows available external source links, product verification, nutrition basis/verification, ingredients, the persisted current-method grade and factors, methodology limitations, and the existing explanation state.
+- Anonymous recent products use browser-local `localStorage` only. A viewed product is deduplicated and moved to the top; history is capped at 20; the user can clear it. The home page and `/history` use this same store, and `ProductGrade` reads the same persisted assessment API as detail/search cards. No anonymous search event is written to the shared database, avoiding cross-user exposure. Existing database Scan/SearchEvent models are not used for this browser history.
+- Unscoped `/api/scans`, `/api/scans/recent`, and `/api/scans/{id}` APIs return 410 `HISTORY_NOT_AVAILABLE` to avoid disclosing anonymous events across users. Existing rows are retained; no database history records were deleted.
+- Navbar/footer expose working Scan and Recent products links; the dead Insights nav item was removed. OCR upload/review/analyze remains on `/scan`, with analysis and explanations shown inline and a clear route back to product lookup.
+- Verification: 53 tests pass; the new history tests cover malformed/empty storage, de-duplication, recency order, and list limit. TypeScript and lint pass. Prisma validation passes; migration status reports five migrations and the database up to date. Production build passes with `next build --webpack` when run outside the sandbox.
+- Database-backed journey checks: catalog name search for Nutella resolved the existing product, product details included its Open Food Facts source record, the current persisted grade was D/35, and explanation state was `NOT_CONFIGURED`. A separate temporary 100ml OCR analysis persisted as `INSUFFICIENT_DATA`, reloaded with no grade, and returned a deterministic explanation; the row was removed afterward. Existing Nutella barcode/source/grade data were read-only.
+- Main browser automation could not run in this environment: the in-app browser timed out reaching localhost and direct localhost access from the shell was denied/timed out. Next dev under default Turbopack also hit a Windows junction-point failure; `next dev --webpack` started but localhost remained inaccessible. No browser journey or live upload-through-UI is claimed as observed.
+- Prisma schema was not changed for this phase. Search and viewing history are local, not server-persisted. A successful barcode lookup continues to use the existing live source/persistence code; OCR remains independent.

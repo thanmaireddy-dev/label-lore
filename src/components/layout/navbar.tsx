@@ -27,8 +27,7 @@ import { Button } from "@/components/ui/button";
 
 const navLinks = [
   { href: "/scan", label: "Scan" },
-  { href: "/history", label: "History" },
-  { href: "/insights", label: "Insights" },
+  { href: "/history", label: "Recent" },
 ];
 
 export function Navbar() {

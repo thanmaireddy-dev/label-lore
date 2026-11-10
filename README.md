@@ -96,6 +96,12 @@ npm run dev
 
 Open http://localhost:3000
 
+## Product search and recent history
+
+On `/scan`, name, brand, and category queries search products already in the local PostgreSQL catalog. A submitted 8–14 digit barcode calls the existing Open Food Facts lookup and opens the persisted product detail page when found. Product names are not looked up against Open Food Facts. The scan page also includes the independent food-label OCR review and analysis flow.
+
+Opening a product adds it to Recent products in this browser. `/history`, the home-page recent-products section, and the footer history link use browser `localStorage`; no anonymous search history is written to the shared database. Repeated views move a product to the top, the list keeps at most 20 products, and Clear history removes the browser-local list. Recent cards load the same persisted current-method grade shown on product detail pages. Unscoped legacy `/api/scans` endpoints return `410 HISTORY_NOT_AVAILABLE` instead of disclosing shared anonymous history.
+
 ---
 
 ## Available Scripts
@@ -106,7 +112,7 @@ Open http://localhost:3000
 | `npm run build` | Production build |
 | `npm run start` | Start production server |
 | `npm run lint` | Run ESLint |
-| `npm run test` | Run ingestion, grading, OCR extraction, and OCR analysis tests |
+| `npm run test` | Run ingestion, grading, OCR, OCR analysis, and browser-history data tests |
 | `npm run db:migrate:legacy` | Safely transfer rows from the preserved SQLite database |
 | `npx tsc --noEmit` | TypeScript type check |
 | `npx prisma generate` | Regenerate Prisma client |

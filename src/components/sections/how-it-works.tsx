@@ -19,28 +19,28 @@ const steps = [
     number: "01",
     title: "Scan the label",
     description:
-      "Take a photo of any packaged food label, or search by product name. Our system reads the ingredient list and nutrition panel.",
+      "Look up a barcode, search the local product catalog by name, or upload a food-label photo for OCR.",
   },
   {
     icon: FlaskConical,
     number: "02",
     title: "Analyse ingredients",
     description:
-      "Every ingredient is checked against our database of additives, allergens, and FSSAI guidelines — no black-box scoring.",
+      "Review and correct label text. Product records show their available ingredients, nutrition, and source attribution.",
   },
   {
     icon: ShieldCheck,
     number: "03",
     title: "Get your breakdown",
     description:
-      "See a plain-language summary: what's safe, what's flagged, and why. Every warning comes with evidence, not fear.",
+      "View the persisted A–E nutrition profile, score factors, data completeness, and an optional explanation when configured.",
   },
   {
     icon: FileText,
     number: "04",
     title: "Compare & decide",
     description:
-      "Save scans, compare products side-by-side, and track your reading history. Make informed choices at the shelf.",
+      "Reopen products from recent history stored in this browser. OCR results stay separate from branded products.",
   },
 ];
 

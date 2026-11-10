@@ -9,6 +9,7 @@ import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
+import { TrackProductView } from "@/components/sections/recent-products";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -43,16 +44,14 @@ export default async function ScanResultPage({ params }: PageProps) {
     notFound();
   }
 
-  // Record a scan visit (fire-and-forget; failures don't block the page)
-  ScanService.createScan(product.id, "manual").catch(() => {});
-
   const n = product.nutrition;
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-12 md:px-8 md:py-16">
-      <Link href="/" className="mb-8 inline-flex items-center gap-2 text-sm text-foreground-muted hover:text-foreground">
+      <TrackProductView productId={product.id} name={product.name} brand={product.brand?.name ?? "Unknown brand"} />
+      <Link href="/scan" className="mb-8 inline-flex items-center gap-2 text-sm text-foreground-muted hover:text-foreground">
         <ChevronLeft className="size-4" />
-        Back to home
+        Back to search or scan another label
       </Link>
 
       <div className="grid gap-8 md:grid-cols-3">
@@ -68,6 +67,12 @@ export default async function ScanResultPage({ params }: PageProps) {
             {product.category?.name && (
               <p className="mb-6 text-xs text-foreground-muted">{product.category.name}</p>
             )}
+            <p className="mb-5 text-xs text-foreground-muted">Product data: {product.verificationStatus.toLowerCase().replaceAll("_", " ")}</p>
+            {product.sourceRecords.length > 0 && <div className="mb-5 text-xs text-foreground-muted">
+              <p className="font-medium">Source information</p>
+              {product.sourceRecords.map((record) => <a key={record.id} href={record.sourceUrl} target="_blank" rel="noreferrer" className="mt-1 block text-primary hover:underline">{record.source.name} · retrieved {new Date(record.retrievedAt).toLocaleDateString()}</a>)}
+            </div>}
+            {product.sourceRecords.length === 0 && <p className="mb-5 text-xs text-foreground-muted">No external source record available.</p>}
 
             <div className="border-t border-border pt-6"><ProductGrade productId={product.id} /></div>
           </div>
@@ -105,7 +110,7 @@ export default async function ScanResultPage({ params }: PageProps) {
                   <FileText className="size-5 text-primary" />
                   Nutrition Facts
                   <span className="ml-auto text-xs font-normal text-foreground-muted">
-                    {n.nutritionBasis ? `Per ${n.nutritionBasis}` : "Source basis unspecified"}{n.servingSizeG ? ` · Serving ${n.servingSizeG}g` : ""}
+                    {n.nutritionBasis ? `Per ${n.nutritionBasis}` : "Source basis unspecified"}{n.servingSizeG ? ` · Serving ${n.servingSizeG}g` : ""} · {n.verification.toLowerCase().replaceAll("_", " ")}
                   </span>
                 </CardTitle>
               </CardHeader>

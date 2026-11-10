@@ -12,7 +12,7 @@ import { siteConfig } from "@/config/site";
 const footerLinks = {
   product: [
     { href: "/scan", label: "Scan a label" },
-    { href: "/#recent-scans", label: "Scan history" },
+    { href: "/history", label: "Recent products" },
     { href: "/#", label: "Insights (Coming Soon)", disabled: true },
   ],
   resources: [

@@ -1,6 +1,6 @@
 # CODEX_HANDOFF.md — Instructions for the Next Coding Agent
 
-> **Current update (2026-11-10):** PostgreSQL setup, legacy transfer, OFF persistence, normalization, deterministic grading, product UI, AI grade explanations, local food-label OCR, and OCR-to-grading are implemented. OCR review submissions persist as standalone unverified analyses and reuse the existing scorer and explanation service. No OpenAI credentials are configured, so live provider generation has not been tested. Prisma reports migrations up to date; the original SQLite file and backup remain preserved.
+> **Current update (2026-11-10):** PostgreSQL setup, legacy transfer, OFF persistence, normalization, deterministic grading, product UI, AI grade explanations, local food-label OCR, OCR-to-grading, catalog/barcode search, and browser-local recent products are implemented. OCR analyses are standalone and unverified. OpenAI credentials are not configured; no live provider generation has been tested. Prisma reports migrations up to date; the original SQLite file and backup remain preserved.
 
 
 ## Read These First
@@ -15,7 +15,7 @@
 - **Inspect before editing.** Read the relevant source file before changing anything. The actual code may differ from this document.
 - **Preserve the architecture.** Features are organised as service classes in `src/features/`. API routes delegate to these services. Do not collapse service methods into route handlers.
 - **Use existing primitives.** UI components (Button, Card, StatusPill), design tokens (globals.css), and animation presets (lib/animations.ts) already exist. Use them.
-- **Do not assume planned features are implemented.** Persisted scoring and AI grade explanations are implemented; OCR extraction is implemented; history and insights remain incomplete.
+- **Do not assume planned features are implemented.** Product history is browser-local in `/history`; `/insights` remains incomplete.
 - **Do not restart or rewrite.** The existing data layer, API routes, and UI are working. Build on them.
 
 ---
@@ -23,11 +23,11 @@
 ## Current Capabilities (Working)
 
 - Product and scan data stored in PostgreSQL using `food` and `app` schemas
-- REST API includes products, scans, barcode ingestion, `POST /api/ocr`, OCR analysis/retrieval/explanation endpoints, and persisted grade/explanation endpoints
+- REST API includes products, barcode ingestion, `POST /api/ocr`, OCR analysis/retrieval/explanation endpoints, and persisted grade/explanation endpoints; unscoped anonymous scan-history endpoints return 410
 - Home page renders real data from DB (server component)
 - Product detail page at `/scan/[id]` with nutrition, ingredients, claims
-- Search widget (debounced, live dropdown) in hero and /scan page
-- Recent scans horizontal carousel on home page
+- Search widget on hero and `/scan` searches the local catalog by name/brand/category and submits barcode lookups to Open Food Facts
+- Recent products on home and `/history` are stored in the current browser only
 - Product displays use the persisted current-version grade, with insufficient-data/loading/error states
 
 ---
@@ -39,7 +39,7 @@
 | Deterministic scoring engine and persisted UI integration | Implemented; see `docs/GRADING_METHODOLOGY.md` |
 | Food-label OCR and grading | Implemented with local Tesseract.js, editable unverified drafts, standalone analysis persistence, existing deterministic scorer, and reused explanation service |
 | AI grade explanations | Implemented; optional OpenAI config required for generation |
-| /history page | Route exists in nav but no page file |
+| /history page | Implemented with browser-local recent products and clear-history action |
 | /insights page | Route exists in nav but no page file |
 | Authentication | Not started |
 | Newsletter backend | Form is UI-only |
@@ -53,11 +53,10 @@
 
 `src/features/analysis/grading.ts` is pure and deterministic. `ProductGradingService` persists one row per product and methodology version. `GET /api/products/[id]/grade` returns the current methodology row or creates it when absent; POST forces a current-version recalculation. Product cards and detail analysis consume this API and validate its response contract. Thresholds, grade mapping, assumptions, and references are in `docs/GRADING_METHODOLOGY.md`. No production product display uses fabricated grades.
 
-### 2. Create the /history page (Phase 3)
+### 2. Recent product history (complete)
 
-- File: `src/app/history/page.tsx`
-- Fetch `ScanService.getAllScans()` (already implemented)
-- Display scans in a list/grid with product name, brand, grade, timestamp
+- `src/app/history/page.tsx` reads browser-local product visits; no user history is exposed from the shared database.
+- Product detail views update the bounded, deduplicated local list; clear action removes it.
 
 ### 3. Food-label OCR and analysis (Phases 6 and 8, implemented)
 
@@ -83,7 +82,7 @@
 
 ## Remaining product work
 
-History/insights routes and authentication remain deferred. AI explanation generation requires optional provider credentials. Do not add ingredient hazard classifications from INS codes alone; the current additive references contain identity/function fields but no verified hazard status.
+Insights route and authentication remain deferred. AI explanation generation requires optional provider credentials. Do not add ingredient hazard classifications from INS codes alone; the current additive references contain identity/function fields but no verified hazard status.
 
 ---
 
@@ -106,6 +105,14 @@ Branch `main` has diverged from origin (1 local commit, 1 remote commit); a merg
 ```bash
 git commit -m "docs: finalize Phase 2 handoff documentation"
 ```
+
+## Product discovery and local history (Phase 9, 2026-11-10)
+
+- `/scan` debounces local catalog search by product name, brand, or category. Submitting 8–14 digits uses `/api/products/by-barcode/{barcode}` and navigates to the persisted product detail; names are not searched against Open Food Facts.
+- `/history` and the home-page Recent products list use `localStorage`, deduplicate to the most recent 20 views, and provide Clear history. Product detail mounts `TrackProductView`; all cards request the same persisted grade API.
+- Product detail shows available source URLs, product/nutrition verification, ingredients/nutrition, deterministic grade factors/method limits, explanation, and a return link to search/OCR.
+- The unscoped `/api/scans` endpoints return 410 `HISTORY_NOT_AVAILABLE`; the anonymous history UI no longer reads or writes shared scan records. Existing DB rows were not deleted.
+- Verification: 53 tests, TypeScript, ESLint, Prisma validate/migration status, and production build pass. Read-only PostgreSQL checks found Nutella in catalog search with Open Food Facts provenance and persisted D/35. Browser automation was unavailable because this environment could not reach localhost; do not claim a UI click-through was observed.
 
 ## Active architecture update — 2026-10-31
 

@@ -4,6 +4,7 @@ import type { ProductSummary, ProductWithDetails } from "./product.types";
 const productDetails = {
   brand: true,
   category: true,
+  sourceRecords: { include: { source: true }, orderBy: { retrievedAt: "desc" as const } },
   nutrition: true,
   ingredients: { include: { ingredient: { include: { additive: true } } }, orderBy: { order: "asc" as const } },
   claims: { include: { claim: true } },
