@@ -22,13 +22,13 @@ function assessment(overrides: Partial<NonNullable<GradeProductInput["nutrition"
 class MemoryExplanationRepository implements GradeExplanationRepository {
   current: CurrentProductAssessment | null = assessment();
   readonly saved = new Map<string, { explanation: string; model: string; createdAt: Date }>();
-  readonly saves: Array<{ productId: string; methodologyVersion: string; promptVersion: string; explanation: string; model: string }> = [];
+  readonly saves: Array<{ analysisId: string; methodologyVersion: string; promptVersion: string; explanation: string; model: string }> = [];
 
   async loadCurrent() { return this.current; }
-  async findExplanation(_productId: string, methodologyVersion: string, promptVersion: string) {
+  async findExplanation(_analysisId: string, methodologyVersion: string, promptVersion: string) {
     return this.saved.get(`${methodologyVersion}:${promptVersion}`) ?? null;
   }
-  async saveExplanation(input: { productId: string; methodologyVersion: string; promptVersion: string; explanation: string; model: string }) {
+  async saveExplanation(input: { analysisId: string; methodologyVersion: string; promptVersion: string; explanation: string; model: string }) {
     this.saves.push(input);
     const value = { explanation: input.explanation, model: input.model, createdAt: new Date("2026-11-08T10:30:00.000Z") };
     this.saved.set(`${input.methodologyVersion}:${input.promptVersion}`, value);

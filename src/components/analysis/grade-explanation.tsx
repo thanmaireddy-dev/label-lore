@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { explanationResponseSchema, type ExplanationResult } from "@/features/analysis/explanation.contract";
 
 type LastAction = "load" | "generate";
+type GradeExplanationProps = { productId: string; endpoint?: never } | { productId?: never; endpoint: string };
 
-export function GradeExplanation({ productId }: { productId: string }) {
+export function GradeExplanation(props: GradeExplanationProps) {
+  const apiUrl = props.endpoint ?? `/api/products/${encodeURIComponent(props.productId ?? "")}/explanation`;
   const [result, setResult] = useState<ExplanationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,21 +35,21 @@ export function GradeExplanation({ productId }: { productId: string }) {
     setError(null);
     setLastAction("load");
     try {
-      const response = await fetch(`/api/products/${encodeURIComponent(productId)}/explanation`, { cache: "no-store" });
+      const response = await fetch(apiUrl, { cache: "no-store" });
       setResult(await readResponse(response));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The explanation could not be loaded. Please retry.");
     } finally {
       setLoading(false);
     }
-  }, [productId]);
+  }, [apiUrl]);
 
   const generate = async () => {
     setGenerating(true);
     setError(null);
     setLastAction("generate");
     try {
-      const response = await fetch(`/api/products/${encodeURIComponent(productId)}/explanation`, { method: "POST" });
+      const response = await fetch(apiUrl, { method: "POST" });
       setResult(await readResponse(response));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The explanation could not be generated. Please retry.");
@@ -90,7 +92,7 @@ export function GradeExplanation({ productId }: { productId: string }) {
         <p className="mt-4 text-sm leading-6 text-foreground-muted">AI explanations are not configured. Set the server-side <code>OPENAI_API_KEY</code> and <code>OPENAI_MODEL</code> values to enable them.</p>
       ) : result?.status === "NOT_GENERATED" ? (
         <div className="mt-4">
-          <p className="text-sm text-foreground-muted">Generate a short explanation from the saved grade factors and product data.</p>
+          <p className="text-sm text-foreground-muted">Generate a short explanation from the saved grade factors and reviewed food data.</p>
           <button type="button" onClick={() => void generate()} className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90">Generate explanation</button>
         </div>
       ) : <p className="mt-4 text-sm text-foreground-muted">No explanation is available for this product.</p>}

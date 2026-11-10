@@ -6,7 +6,7 @@
 
 ## Project Purpose
 
-Label Reader is a web application that helps Indian consumers understand food product labels. Users can search for products and view ingredients (including INS additive codes), nutrition facts, front-of-pack claims, and a persisted deterministic A–E nutrition profile. The score is Label Lore's own documented heuristic, not an official FSSAI rating or medical assessment. AI grade explanations are available on product detail pages when the optional OpenAI server configuration is set; food-label OCR can extract editable unverified text from uploaded images.
+Label Reader is a web application that helps Indian consumers understand food product labels. Users can search for products and view ingredients (including INS additive codes), nutrition facts, front-of-pack claims, and a persisted deterministic A–E nutrition profile. The score is Label Lore's own documented heuristic, not an official FSSAI rating or medical assessment. AI grade explanations are available when the optional OpenAI server configuration is set. Food-label OCR can extract editable unverified text and submit reviewed label values to the same deterministic grading method without creating a branded product.
 
 ---
 
@@ -106,7 +106,7 @@ Open http://localhost:3000
 | `npm run build` | Production build |
 | `npm run start` | Start production server |
 | `npm run lint` | Run ESLint |
-| `npm run test` | Run ingestion, grading, and OCR extraction tests |
+| `npm run test` | Run ingestion, grading, OCR extraction, and OCR analysis tests |
 | `npm run db:migrate:legacy` | Safely transfer rows from the preserved SQLite database |
 | `npx tsc --noEmit` | TypeScript type check |
 | `npx prisma generate` | Regenerate Prisma client |
@@ -198,12 +198,22 @@ The PostgreSQL baseline, legacy SQLite transfer, salt migration, and grading-res
 
 Product detail pages now include an explicit, user-triggered grade explanation panel. `GET /api/products/{id}/explanation` returns an existing saved explanation, a deterministic insufficient-data explanation, or a not-configured/not-generated state; it never makes an OpenAI call. `POST` generates only when the product has a persisted `GRADED` result and both `OPENAI_API_KEY` and `OPENAI_MODEL` are configured. The server calls OpenAI's Responses API directly with strict structured output, `store: false`, a timeout, and explicit instruction/data separation. It supplies only the persisted grade, nutrition factors, completeness and product/ingredient verification context. It cannot calculate or update grades. Explanations are stored by product, methodology version and prompt version. No AI explanation was persisted locally because credentials were not configured; the real provider path is covered with mocked tests, not a live provider call.
 
-To enable generation locally, add `OPENAI_API_KEY` and `OPENAI_MODEL` to the private server environment (`.env` and `.env.local`); never expose the key through a `NEXT_PUBLIC_` variable. Missing configuration is supported and the detail UI shows a setup message. Products with insufficient grading data always receive deterministic explanation text without an AI call.
+To enable generation locally, add `OPENAI_API_KEY` and `OPENAI_MODEL` to the private server environment (`.env` and `.env.local`); never expose the key through a `NEXT_PUBLIC_` variable. Missing configuration is supported and the detail UI shows a setup message. Products and OCR analyses with insufficient grading data always receive deterministic explanation text without an AI call.
 
 Verification for this update: the additive explanation migration `20261108120000_product_grade_explanations` is applied; Prisma status reports the database up to date. Docker reports `label-lore-postgres` healthy and Prisma connects. The explanation API has explicit GET/POST behavior and errors for missing products, rate limits, timeouts, provider errors and invalid output. Focused provider/service/contract tests use mocks; no live OpenAI request was performed.
+
+## OCR label analysis (Phase 8, 2026-11-10)
+
+After reviewing OCR text and correcting ingredients, nutrient values, and the `per 100 g` or `per 100 ml` basis, users can submit a label for analysis. `POST /api/ocr/analyses` strictly validates the reviewed fields on the server and recalculates with the existing `scoreProduct` engine. Missing values stay null; the scorer returns Insufficient Data for missing required nutrition or an unsupported 100 ml basis. Client-submitted grades and factors are rejected.
+
+Results are stored in `food.FoodLabelAnalysis`, introduced by additive migration `20261110100000_ocr_food_label_analysis`. The row preserves source OCR text/draft, confirmed values, basis, unverified status, and deterministic result without a Product or barcode relationship. Repeating the same submission key and content returns the same row; changing content with that key returns 409. `GET /api/ocr/analyses/{id}` retrieves a saved result.
+
+Valid OCR grades use the existing explanation service through `GET|POST /api/ocr/analyses/{id}/explanation`, which reads persisted analysis data and cannot change the grade. Insufficient-data explanations are deterministic. Missing `OPENAI_API_KEY` or `OPENAI_MODEL` does not block analysis and is reported by the explanation endpoint. No live OpenAI request was made.
+
+Verification on 2026-11-10: Prisma reports the local database up to date. A temporary real PostgreSQL check created, retrieved, and repeated an OCR analysis (grade A), found one row for the submission key, and received `NOT_CONFIGURED` for explanation; the temporary row was removed. Feature tests cover correction, valid and insufficient results, rejected manipulated values, per-100ml handling, sodium/salt separation, and idempotent reuse. See `PROJECT_STATUS.md` for full check results.
 
 ## Food label OCR (Phase 6, 2026-11-08)
 
 The scan page accepts JPEG, PNG, and WebP images up to 8 MB. The Node.js route checks type, size, non-empty content, and image signatures, then uses Tesseract.js locally through WebAssembly to read English text. Images stay in request memory and are not saved. Tesseract's English trained data downloads on first use and is cached under ignored `node_modules/.cache/label-lore-tesseract`, so first-time operation needs outbound access; recognition runs locally after that. OCR is not guaranteed accurate.
 
-`POST /api/ocr` accepts multipart form data with the `image` field and returns preserved raw OCR text, best-effort ingredients and nutrition fields, source snippets, explicit nulls, and warnings. Energy is normalized to kcal, nutrient masses to g, sodium to mg, and a readable per-100g/per-100ml basis is recorded. Salt and sodium remain separate. The review UI lets users edit parsed values and labels changed values as user corrections. OCR drafts are not saved as branded products or sent to grading.
+`POST /api/ocr` accepts multipart form data with the `image` field and returns preserved raw OCR text, best-effort ingredients and nutrition fields, source snippets, explicit nulls, and warnings. Energy is normalized to kcal, nutrient masses to g, sodium to mg, and a readable per-100g/per-100ml basis is recorded. Salt and sodium remain separate. The review UI lets users edit parsed values and labels changed values as user corrections. Uploading alone does not save a product or calculate a grade; users explicitly submit their reviewed values using the Phase 8 flow below.

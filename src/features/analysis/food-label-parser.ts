@@ -42,7 +42,7 @@ const emptyValues = (): Record<LabelNutrientKey, ParsedLabelValue> => ({
   salt: { value: null, unit: "g", sourceText: null, status: "UNAVAILABLE" },
 });
 
-function splitIngredients(text: string): Array<{ name: string; originalText: string }> {
+export function splitFoodLabelIngredients(text: string): Array<{ name: string; originalText: string }> {
   const items: string[] = [];
   let depth = 0;
   let start = 0;
@@ -134,7 +134,7 @@ export function parseFoodLabelText(rawText: string): FoodLabelExtraction {
 
   return {
     rawText,
-    ingredients: { originalText: ingredientText, items: ingredientText ? splitIngredients(ingredientText) : [] },
+    ingredients: { originalText: ingredientText, items: ingredientText ? splitFoodLabelIngredients(ingredientText) : [] },
     nutrition: { basis, values },
     warnings,
   };

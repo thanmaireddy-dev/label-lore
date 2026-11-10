@@ -59,7 +59,7 @@ function pickSaltG(n: Record<string, unknown> | undefined, product: OpenFoodFact
   const milligrams = toFiniteNumber(n.salt_mg_value);
   return milligrams === null ? null : milligrams / 1000;
 }
-function normalizedName(value: string): string {
+export function normalizeIngredientName(value: string): string {
   return value.normalize("NFKC").toLocaleLowerCase("en-US")
     .replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[‐‑‒–—]/g, "-")
     .trim().replace(/\s+([,.;:!?])/g, "$1").replace(/([([{])\s+/g, "$1")
@@ -93,7 +93,7 @@ function parseQuantityInGrams(value: string | null | undefined): number | null {
 function normalizeIngredients(product: OpenFoodFactsProduct, label: string | null): NormalizedIngredient[] {
   const structured = product.ingredients?.flatMap(extractIngredientText).map((v) => v.trim()).filter(Boolean) ?? [];
   const items = structured.length ? structured : label ? splitIngredientText(label) : [];
-  return items.map((rawName, index) => ({ rawName, normalizedName: normalizedName(rawName), order: index, insCode: extractInsCode(rawName) })).filter((item) => item.normalizedName.length > 0);
+  return items.map((rawName, index) => ({ rawName, normalizedName: normalizeIngredientName(rawName), order: index, insCode: extractInsCode(rawName) })).filter((item) => item.normalizedName.length > 0);
 }
 function normalizeNutrition(product: OpenFoodFactsProduct): NormalizedNutrition | null {
   const n = product.nutriments as Record<string, unknown> | undefined; if (!n) return null;

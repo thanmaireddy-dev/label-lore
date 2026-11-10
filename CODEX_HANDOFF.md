@@ -1,6 +1,6 @@
 # CODEX_HANDOFF.md — Instructions for the Next Coding Agent
 
-> **Current update (2026-11-08):** PostgreSQL setup, legacy transfer, OFF persistence, normalization, deterministic grading, UI integration, and Phase 5 AI grade explanations and Phase 6 local food-label OCR are implemented. OCR uses Tesseract.js and returns editable, unverified drafts without persisting them. No OpenAI credentials are configured, so provider calls remain mock-tested only. Prisma reports migrations up to date, and the original SQLite file and backup remain preserved.
+> **Current update (2026-11-10):** PostgreSQL setup, legacy transfer, OFF persistence, normalization, deterministic grading, product UI, AI grade explanations, local food-label OCR, and OCR-to-grading are implemented. OCR review submissions persist as standalone unverified analyses and reuse the existing scorer and explanation service. No OpenAI credentials are configured, so live provider generation has not been tested. Prisma reports migrations up to date; the original SQLite file and backup remain preserved.
 
 
 ## Read These First
@@ -23,7 +23,7 @@
 ## Current Capabilities (Working)
 
 - Product and scan data stored in PostgreSQL using `food` and `app` schemas
-- REST API includes products, scans, barcode ingestion, `POST /api/ocr`, and persisted grade/explanation endpoints
+- REST API includes products, scans, barcode ingestion, `POST /api/ocr`, OCR analysis/retrieval/explanation endpoints, and persisted grade/explanation endpoints
 - Home page renders real data from DB (server component)
 - Product detail page at `/scan/[id]` with nutrition, ingredients, claims
 - Search widget (debounced, live dropdown) in hero and /scan page
@@ -37,7 +37,7 @@
 | Feature | Status |
 |---|---|
 | Deterministic scoring engine and persisted UI integration | Implemented; see `docs/GRADING_METHODOLOGY.md` |
-| Food-label OCR | Implemented with local Tesseract.js and editable unverified drafts |
+| Food-label OCR and grading | Implemented with local Tesseract.js, editable unverified drafts, standalone analysis persistence, existing deterministic scorer, and reused explanation service |
 | AI grade explanations | Implemented; optional OpenAI config required for generation |
 | /history page | Route exists in nav but no page file |
 | /insights page | Route exists in nav but no page file |
@@ -59,11 +59,13 @@
 - Fetch `ScanService.getAllScans()` (already implemented)
 - Display scans in a list/grid with product name, brand, grade, timestamp
 
-### 3. Food-label OCR (Phase 6, implemented)
+### 3. Food-label OCR and analysis (Phases 6 and 8, implemented)
 
 - `POST /api/ocr` and `FoodLabelUpload` are implemented.
 - Tesseract.js runs locally in the Node.js route; English trained data downloads and caches on first use.
-- Supports JPEG, PNG and WebP up to 8 MB; output stays unverified and is not sent to grading.
+- Supports JPEG, PNG and WebP up to 8 MB. Reviewed values are sent to `POST /api/ocr/analyses`, server validated and passed to the existing `scoreProduct` engine.
+- Results persist in `food.FoodLabelAnalysis` without a Product/barcode record. Same idempotency key and content reuses the analysis; changed content conflicts. `GET /api/ocr/analyses/{id}` retrieves it.
+- Explanation endpoints reuse `ProductGradeExplanationService`; they load the persisted OCR analysis and do not change its grade. Missing OpenAI config does not block analysis.
 
 ### 4. AI grade explanations (Phase 5, implemented)
 
@@ -81,7 +83,7 @@
 
 ## Remaining product work
 
-OCR extraction is implemented; OCR-to-grading, history/insights routes, and authentication remain deferred. AI explanation generation is implemented but requires optional provider credentials. Do not add ingredient hazard classifications from INS codes alone; the current additive references contain identity/function fields but no verified hazard status.
+History/insights routes and authentication remain deferred. AI explanation generation requires optional provider credentials. Do not add ingredient hazard classifications from INS codes alone; the current additive references contain identity/function fields but no verified hazard status.
 
 ---
 
@@ -127,7 +129,7 @@ Ingredient normalization preserves OFF source text, order, repeated entries, and
 
 The current grading method is `label-lore-npm2004-adapted-v1`, documented in `docs/GRADING_METHODOLOGY.md`. It requires complete `100g` energy, saturated fat, total sugars, and sodium or salt data. Nutella persists as D/35 with transparent nutrient factors; two calculations update the same `(productId, methodologyVersion)` row. `POST /api/products/[id]/grade` exposes that calculation. Ingredient/additive references do not alter points because their hazard status is unverified; 100ml-only products remain ungraded without a density conversion. The method is a project heuristic and is not an FSSAI rating.
 
-The grading core, product grading UI, and AI explanation flow are implemented. Keep OCR-to-grading and GS1 DataKart integration deferred.
+The grading core, product grading UI, AI explanation flow, and OCR-to-grading are implemented. GS1 DataKart integration remains deferred.
 
 ## Product grading UI integration (2026-11-01)
 

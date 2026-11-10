@@ -279,6 +279,33 @@ model ProductGradeExplanation {
   @@schema("food")
 }
 
+model FoodLabelAnalysis {
+  id                            String             @id @default(cuid())
+  submissionKey                 String             @unique
+  submissionFingerprint         String
+  sourceRawText                 String             @db.Text
+  ocrDraft                      Json
+  confirmedData                 Json
+  nutritionBasis                String?
+  verificationStatus            VerificationStatus @default(UNVERIFIED)
+  status                        String
+  grade                         String?
+  score                         Int?
+  methodologyVersion            String
+  factors                       Json
+  dataCompleteness              Json
+  calculatedAt                  DateTime           @default(now())
+  explanation                   String?
+  explanationModel              String?
+  explanationMethodologyVersion String?
+  explanationPromptVersion      String?
+  explanationCreatedAt          DateTime?
+  createdAt                     DateTime           @default(now())
+
+  @@index([createdAt])
+  @@schema("food")
+}
+
 model User {
   id        String        @id @default(cuid())
   createdAt DateTime      @default(now())

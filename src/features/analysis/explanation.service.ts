@@ -8,7 +8,7 @@ import type { ExplanationResult } from "./explanation.contract";
 
 export const EXPLANATION_PROMPT_VERSION = "grade-explanation-prompt-v1";
 
-type SavedExplanation = {
+export type SavedExplanation = {
   explanation: string;
   model: string;
   createdAt: Date;
@@ -22,9 +22,9 @@ export type CurrentProductAssessment = {
 };
 
 export interface GradeExplanationRepository {
-  loadCurrent(productId: string): Promise<CurrentProductAssessment | null>;
-  findExplanation(productId: string, methodologyVersion: string, promptVersion: string): Promise<SavedExplanation | null>;
-  saveExplanation(input: { productId: string; methodologyVersion: string; promptVersion: string; explanation: string; model: string }): Promise<SavedExplanation>;
+  loadCurrent(analysisId: string): Promise<CurrentProductAssessment | null>;
+  findExplanation(analysisId: string, methodologyVersion: string, promptVersion: string): Promise<SavedExplanation | null>;
+  saveExplanation(input: { analysisId: string; methodologyVersion: string; promptVersion: string; explanation: string; model: string }): Promise<SavedExplanation>;
 }
 
 export class ExplanationRequestError extends Error {
@@ -35,10 +35,10 @@ export class ExplanationRequestError extends Error {
 }
 
 class PrismaGradeExplanationRepository implements GradeExplanationRepository {
-  async loadCurrent(productId: string): Promise<CurrentProductAssessment | null> {
-    const product = await ProductRepository.getById(productId);
+  async loadCurrent(analysisId: string): Promise<CurrentProductAssessment | null> {
+    const product = await ProductRepository.getById(analysisId);
     if (!product) return null;
-    const gradeRow = await ProductGradingService.getOrCalculateCurrent(productId);
+    const gradeRow = await ProductGradingService.getOrCalculateCurrent(analysisId);
     if (!gradeRow) return null;
     const parsedGrade = gradingResultSchema.safeParse({
       ...gradeRow,
@@ -59,23 +59,23 @@ class PrismaGradeExplanationRepository implements GradeExplanationRepository {
     };
   }
 
-  findExplanation(productId: string, methodologyVersion: string, promptVersion: string): Promise<SavedExplanation | null> {
+  findExplanation(analysisId: string, methodologyVersion: string, promptVersion: string): Promise<SavedExplanation | null> {
     return prisma.productGradeExplanation.findUnique({
-      where: { productId_methodologyVersion_promptVersion: { productId, methodologyVersion, promptVersion } },
+      where: { productId_methodologyVersion_promptVersion: { productId: analysisId, methodologyVersion, promptVersion } },
       select: { explanation: true, model: true, createdAt: true },
     });
   }
 
-  saveExplanation(input: { productId: string; methodologyVersion: string; promptVersion: string; explanation: string; model: string }): Promise<SavedExplanation> {
+  saveExplanation(input: { analysisId: string; methodologyVersion: string; promptVersion: string; explanation: string; model: string }): Promise<SavedExplanation> {
     return prisma.productGradeExplanation.upsert({
       where: {
         productId_methodologyVersion_promptVersion: {
-          productId: input.productId,
+          productId: input.analysisId,
           methodologyVersion: input.methodologyVersion,
           promptVersion: input.promptVersion,
         },
       },
-      create: input,
+      create: { productId: input.analysisId, methodologyVersion: input.methodologyVersion, promptVersion: input.promptVersion, explanation: input.explanation, model: input.model },
       update: {},
       select: { explanation: true, model: true, createdAt: true },
     });
@@ -125,20 +125,20 @@ export class ProductGradeExplanationService {
     private readonly promptVersion = EXPLANATION_PROMPT_VERSION,
   ) {}
 
-  async get(productId: string): Promise<ExplanationResult | null> {
-    return this.resolve(productId, false);
+  async get(analysisId: string): Promise<ExplanationResult | null> {
+    return this.resolve(analysisId, false);
   }
 
-  async generateAndPersist(productId: string): Promise<ExplanationResult | null> {
-    const active = this.inFlight.get(productId);
+  async generateAndPersist(analysisId: string): Promise<ExplanationResult | null> {
+    const active = this.inFlight.get(analysisId);
     if (active) return active;
-    const request = this.resolve(productId, true).finally(() => this.inFlight.delete(productId));
-    this.inFlight.set(productId, request);
+    const request = this.resolve(analysisId, true).finally(() => this.inFlight.delete(analysisId));
+    this.inFlight.set(analysisId, request);
     return request;
   }
 
-  private async resolve(productId: string, shouldGenerate: boolean): Promise<ExplanationResult | null> {
-    const assessment = await this.repository.loadCurrent(productId);
+  private async resolve(analysisId: string, shouldGenerate: boolean): Promise<ExplanationResult | null> {
+    const assessment = await this.repository.loadCurrent(analysisId);
     if (!assessment) return null;
     const grade = assessment.grade;
     if (grade.status === "INSUFFICIENT_DATA") {
@@ -153,7 +153,7 @@ export class ProductGradeExplanationService {
       };
     }
 
-    const saved = await this.repository.findExplanation(productId, grade.methodologyVersion, this.promptVersion);
+    const saved = await this.repository.findExplanation(analysisId, grade.methodologyVersion, this.promptVersion);
     if (saved) {
       return {
         status: "GENERATED",
@@ -200,7 +200,7 @@ export class ProductGradeExplanationService {
       throw error;
     }
     const persisted = await this.repository.saveExplanation({
-      productId,
+      analysisId,
       methodologyVersion: grade.methodologyVersion,
       promptVersion: this.promptVersion,
       explanation,

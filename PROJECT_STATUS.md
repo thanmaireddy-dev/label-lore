@@ -1,9 +1,9 @@
 # PROJECT_STATUS.md — Label Reader Handoff Report
 
-> **Current update (2026-11-08):** The persisted deterministic grading engine and product UI integration remain verified. Phase 5 AI grade explanations and Phase 6 local food-label OCR are implemented. OCR returns raw text plus editable unverified ingredient/nutrition drafts, without persisting products or grading them.
+> **Current update (2026-11-10):** Phase 8 OCR-to-grading is implemented. Users can review extracted fields, submit them to the existing deterministic scorer, and retrieve a persisted unverified standalone label analysis. No fake Product/barcode is created.
 
 
-_Last updated: 2026-11-08 | Phase: grading, explanations, and local OCR extraction_
+_Last updated: 2026-11-10 | Phase: OCR analysis integrated with grading and explanations_
 
 ## Phase 2B update (2026-10-31)
 
@@ -52,7 +52,7 @@ _Last updated: 2026-11-08 | Phase: grading, explanations, and local OCR extracti
 
 Label Reader is a Next.js web application that helps Indian consumers decode food product labels. It displays ingredient analysis, nutrition facts, and marketing claims for packaged Indian food products.
 
-**Historical note:** Earlier handoff snapshots described placeholder score displays. The grading engine and UI integration are now complete; AI grade explanations are implemented in the 2026-11-08 update. OCR extraction is implemented; OCR-to-grading remains deferred.
+**Historical note:** Earlier handoff snapshots described placeholder score displays and OCR without grading. The grading engine and OCR-to-grading integration are now complete; see the 2026-11-08 and 2026-11-10 updates.
 
 ---
 
@@ -226,7 +226,7 @@ Key design decisions:
 | Feature | Status | Notes |
 |---|---|---|
 | **Grading display** | Implemented | Current-version persisted results across search, featured, recent, and detail views |
-| **OCR upload** | Implemented | Local Tesseract.js extraction and editable unverified review; OCR-to-grading deferred |
+| **OCR upload and analysis** | Implemented | Local Tesseract.js, editable unverified review, server-side grading and standalone persistence |
 | **Newsletter** | UI only | Form renders; no backend submit handler |
 | **Dark mode toggle** | Not started | Sun/Moon icons removed (unused). Design tokens are light-only |
 | **History page** (`/history`) | 404 | Nav link exists, page does not |
@@ -330,11 +330,11 @@ npm run dev
 4. **Persisted methodology results** � Implemented as versioned `food.ProductGradingResult` rows
 5. **Replace mock scoring** in `page.tsx`, `featured-scan.tsx`, and `/scan/[id]/page.tsx` (not part of this task)
 
-### Phase 4 — OCR label extraction (implemented; analysis integration deferred)
+### Phases 4 and 8 — OCR extraction and label analysis (implemented)
 
 6. **Image upload** — JPEG, PNG, WebP; validates signatures and an 8 MB limit
 7. **Local OCR** — Tesseract.js 7 on Node/WebAssembly with cached English data
-8. **Editable parse** — raw OCR text plus unverified ingredient/nutrition draft; OCR-to-grading remains a later phase
+8. **Editable parse and analysis** — review raw OCR text and values, then submit to the existing deterministic scorer; persist unverified analysis without creating a product
 
 ### Phase 5 � AI Explanation Layer
 
@@ -365,7 +365,7 @@ The baseline migration `prisma/migrations/20261031090000_postgresql_foundation/m
 
 Counts reconcile with SQLite: Brand 6, Product 6, Ingredient 9, ProductIngredient 15, Nutrition 6, Claim 4, ProductClaim 4, Scan 6; PostgreSQL additionally has 6 mapped categories and 2 mapped additives. PostgreSQL has 22 validated foreign keys and zero imported relationship orphans. `npx prisma migrate status` reports up to date. The original SQLite source and backup still share SHA-256 `B7E9B8CE8A99C7EB5D48AB7249EA2D69E153F5BE4F299B4E9908901078D6CEB6`.
 
-Checks recorded at this point include the additive salt migration, live OFF Nutella persistence twice, PostgreSQL record and relationship checks, Prisma validation/status, 14 ingestion tests, TypeScript, lint, production build, and `git diff --check`. Barcode persistence and internal API retrieval are verified. The current grading engine and product UI are documented above; Phase 5 AI explanations are recorded in the 2026-11-08 update below. OCR extraction is implemented; OCR-to-grading remains deferred to the next phase.
+Historical verification snapshot before the OCR-to-grading phase: checks included the additive salt migration, live OFF Nutella persistence, PostgreSQL record and relationship checks, Prisma validation/status, 14 ingestion tests, TypeScript, lint, production build, and `git diff --check`. The current OCR-to-grading status and latest checks are in the Phase 8 update below.
 
 ## AI grade explanations (2026-11-08)
 
@@ -381,7 +381,17 @@ Checks recorded at this point include the additive salt migration, live OFF Nute
 - Selected Tesseract.js 7: local Node.js/WebAssembly OCR, with no paid OCR provider or separate service. English trained data is downloaded and cached on first engine use; that initial use needs outbound access.
 - Added `POST /api/ocr` with multipart `image` field, Node runtime, 8 MB limit, JPEG/PNG/WebP MIME and signature checks, empty/invalid file errors, and no image persistence. OCR failures and no-text results return clear client errors.
 - `src/features/analysis/food-label-parser.ts` preserves raw text and line breaks, parses an ingredient line and ordered items, and best-effort nutrition fields. Supported nutrients: energy, total/saturated/trans fat, carbohydrates, total sugars, fiber, protein, sodium, and salt. Energy converts kJ to kcal; mass units convert mg/g where relevant; sodium and salt stay separate. Decimal comma is accepted; `<` values, negative values, unsupported units, and missing fields stay null.
-- The scan-page review shows read-only raw OCR text, an editable ingredient list and nutrient fields, source line snippets, explicit basis, warnings and unverified status. Edits are marked “User corrected” and remain in local review state only. No product creation or grading integration is included in this phase.
+- The scan-page review shows read-only raw OCR text, editable ingredients and nutrient fields, source snippets, explicit basis, warnings and unverified status. Edits are marked “User corrected.” Submitting creates an OCR analysis, not a branded product.
 - Actual OCR smoke check: Tesseract read an in-memory synthetic high-contrast label image and extracted its ingredient line, basis, energy, protein and sodium lines. This is not a representative camera/photo accuracy evaluation. Automated upload/parser tests mock the OCR worker and cover validation, no-text/errors, parser units, nulls, and salt-versus-sodium.
 - Verification: 47 tests pass; TypeScript, ESLint, production build, and `git diff --check` pass.
-- Limitations: English only; low-resolution, rotated, multilingual, curved/reflective packaging and complex nutrition tables may be inaccurate. Confirm all values manually. Output is not persisted or used by grading until the next phase.
+- Limitations: English only; low-resolution, rotated, multilingual, curved/reflective packaging and complex nutrition tables may be inaccurate. Confirm all values manually. Submitted OCR data and results remain unverified.
+
+## OCR-to-grading integration (Phase 8, 2026-11-10)
+
+- Added `POST /api/ocr/analyses`, `GET /api/ocr/analyses/{id}`, and `GET|POST /api/ocr/analyses/{id}/explanation`. The submission accepts only OCR draft plus reviewed ingredient text, basis, and nutrient values; it rejects unknown client grade/score/factor fields and validates finite non-negative bounded numbers on the server.
+- The service splits and normalizes reviewed ingredient names with the existing normalization helper, preserves source raw OCR and original extraction draft, computes correction flags against confirmed values, sets verification to `UNVERIFIED`, and calls the existing pure `scoreProduct` engine. Null values remain null. Per-100ml input is passed as 100ml and produces Insufficient Data under the current method, which requires 100g.
+- Added the minimal standalone `food.FoodLabelAnalysis` model and additive migration `20261110100000_ocr_food_label_analysis`. It stores one row per idempotency key with a fingerprint, source/draft/confirmed JSON, basis/status, grade/score/method/version/factors/completeness/time, and explanation metadata. No Product foreign key, branded product, or barcode is fabricated. Same key + same contents returns the saved record; same key + changed contents returns 409.
+- The OCR explanation repository implements the existing `GradeExplanationRepository`; `ProductGradeExplanationService` handles persisted state and provider generation. Explanation context is loaded from the persisted OCR row and its stored grade. Insufficient results get deterministic text. Missing API key/model gives the existing configuration state without preventing analysis.
+- Real database verification: local PostgreSQL accepted a temporary valid submission and returned grade A; retrieval returned the same row; repeated submission reused its ID and left one row for that submission key. The explanation service returned `NOT_CONFIGURED` because no key is set. The test row was deleted. Prisma reports all five migrations up to date. Existing Nutella persistence, barcode normalization tests, and product explanation tests continue to pass.
+- Automated verification: all 51 tests pass, including OCR service valid/insufficient/malicious-payload/idempotency cases and existing barcode grading tests. `npx prisma validate`, `npx prisma migrate status` (five migrations, up to date), `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check` pass. The first sandboxed build attempt could not reach configured Google Fonts; the production build passed with network access enabled.
+- Limitations: OCR is English and best effort; users must review values. Current grading supports 100g basis only; 100ml without a valid density conversion is insufficient. No live OpenAI generation was tested because credentials are not configured.
