@@ -7,6 +7,7 @@ export type RecentProduct = {
   name: string;
   brand: string;
   visitedAt: string;
+  imageUrl?: string | null;
 };
 
 export function parseRecentProducts(raw: string | null): RecentProduct[] {
@@ -19,7 +20,7 @@ export function parseRecentProducts(raw: string | null): RecentProduct[] {
       const value = entry as Record<string, unknown>;
       if (typeof value.productId !== "string" || typeof value.name !== "string"
         || typeof value.brand !== "string" || typeof value.visitedAt !== "string") return [];
-      return [{ productId: value.productId, name: value.name, brand: value.brand, visitedAt: value.visitedAt }];
+      return [{ productId: value.productId, name: value.name, brand: value.brand, visitedAt: value.visitedAt, imageUrl: typeof value.imageUrl === "string" ? value.imageUrl : null }];
     }).slice(0, RECENT_PRODUCTS_LIMIT);
   } catch {
     return [];

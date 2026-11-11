@@ -7,7 +7,7 @@ const item = (productId: string): RecentProduct => ({ productId, name: `Product 
 test("recent product history tolerates empty, invalid, and malformed local data", () => {
   assert.deepEqual(parseRecentProducts(null), []);
   assert.deepEqual(parseRecentProducts("not json"), []);
-  assert.deepEqual(parseRecentProducts(JSON.stringify([{ productId: "ok", name: "Name", brand: "Brand", visitedAt: "today" }, { productId: 3 }])), [{ productId: "ok", name: "Name", brand: "Brand", visitedAt: "today" }]);
+  assert.deepEqual(parseRecentProducts(JSON.stringify([{ productId: "ok", name: "Name", brand: "Brand", visitedAt: "today" }, { productId: 3 }])), [{ productId: "ok", name: "Name", brand: "Brand", visitedAt: "today", imageUrl: null }]);
 });
 
 test("recent product history moves repeats to the top and caps the list", () => {

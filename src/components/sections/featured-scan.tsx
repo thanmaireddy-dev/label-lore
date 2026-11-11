@@ -1,11 +1,11 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Flame } from "lucide-react";
 import { fadeUp, staggerContainer, viewportOnce } from "@/lib/animations";
 import { ProductWithDetails } from "@/features/products/product.types";
 import Link from "next/link";
 import { ProductGrade } from "@/components/analysis/product-grade";
+import { ProductImage } from "@/components/products/product-image";
 
 interface FeaturedScanProps {
   product?: ProductWithDetails | null;
@@ -65,12 +65,11 @@ export function FeaturedScan({ product }: FeaturedScanProps) {
             className="block rounded-[var(--radius-card)] border border-border bg-surface shadow-[var(--shadow-card)] transition-all hover:shadow-[var(--shadow-elevated)]"
           >
             <div className="grid gap-0 md:grid-cols-5">
-              {/* Left: product image placeholder */}
+              {/* Left: source product image or clean placeholder */}
               <div className="flex items-center justify-center rounded-t-[var(--radius-card)] bg-gradient-to-br from-primary/5 to-primary/10 p-10 md:col-span-2 md:rounded-t-none md:rounded-l-[var(--radius-card)]">
-                <div className="space-y-3 text-center">
-                  <div className="mx-auto flex size-20 items-center justify-center rounded-2xl bg-primary/10">
-                    <Flame className="size-10 text-primary/60" strokeWidth={1.25} />
-                  </div>
+                <div className="w-full max-w-56 space-y-3 text-center">
+                  <ProductImage src={product.imageUrl} alt={`${product.name} product packaging`} className="mx-auto w-full" sizes="(max-width: 768px) 80vw, 320px" />
+                  {product.imageUrl && <p className="text-[10px] text-foreground-muted">Image: Open Food Facts community contribution</p>}
                   <div>
                     <p className="text-sm font-medium text-foreground">
                       {product.name}

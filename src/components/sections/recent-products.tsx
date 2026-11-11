@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ProductGrade } from "@/components/analysis/product-grade";
+import { ProductImage } from "@/components/products/product-image";
 import { addRecentProduct, parseRecentProducts, RECENT_PRODUCTS_EVENT, RECENT_PRODUCTS_STORAGE_KEY, type RecentProduct } from "@/features/history/recent-products";
 
 function readHistory(): RecentProduct[] {
@@ -22,8 +23,8 @@ export function rememberRecentProduct(product: Omit<RecentProduct, "visitedAt">)
   }
 }
 
-export function TrackProductView({ productId, name, brand }: Omit<RecentProduct, "visitedAt">) {
-  useEffect(() => { rememberRecentProduct({ productId, name, brand }); }, [productId, name, brand]);
+export function TrackProductView({ productId, name, brand, imageUrl }: Omit<RecentProduct, "visitedAt">) {
+  useEffect(() => { rememberRecentProduct({ productId, name, brand, imageUrl }); }, [productId, name, brand, imageUrl]);
   return null;
 }
 
@@ -59,6 +60,8 @@ export function RecentProducts({ title = "Recent products", emptyMessage = "Prod
             {entries.map((entry) => (
               <li key={entry.productId}>
                 <Link href={`/scan/${encodeURIComponent(entry.productId)}`} className="block rounded-xl border border-border bg-surface p-5 transition-colors hover:bg-foreground/5">
+                  <ProductImage src={entry.imageUrl} alt={`${entry.name} product packaging`} className="mb-3 w-20" sizes="80px" />
+                  {entry.imageUrl && <p className="mb-2 text-[10px] text-foreground-muted">Image from Open Food Facts</p>}
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <span className="text-xs text-foreground-muted">{new Date(entry.visitedAt).toLocaleDateString()}</span>
                     <ProductGrade productId={entry.productId} compact />

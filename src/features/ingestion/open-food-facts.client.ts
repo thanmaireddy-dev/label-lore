@@ -11,7 +11,7 @@ export class OpenFoodFactsClient {
   constructor(private readonly fetchImpl: typeof fetch = fetch, private readonly userAgent = process.env.OPEN_FOOD_FACTS_USER_AGENT ?? `LabelLore/0.3.0 (${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"})`) {}
   async getProductByBarcode(barcode: string) {
     takeReadSlot();
-    const fields = ["code", "product_name", "product_name_en", "brands", "categories", "image_url", "quantity", "serving_size", "ingredients_text", "ingredients", "allergens", "allergens_tags", "additives_tags", "nutriments", "nutrition_data_per", "last_modified_t"].join(",");
+    const fields = ["code", "product_name", "product_name_en", "brands", "categories", "image_url", "image_front_url", "image_front_small_url", "selected_images", "quantity", "serving_size", "ingredients_text", "ingredients", "allergens", "allergens_tags", "additives_tags", "nutriments", "nutrition_data_per", "last_modified_t"].join(",");
     let response: Response;
     try {
       response = await this.fetchImpl(`${API_BASE}/${encodeURIComponent(barcode)}.json?fields=${encodeURIComponent(fields)}`, {

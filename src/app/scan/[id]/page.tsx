@@ -2,7 +2,7 @@ import { ProductService } from "@/features/products/product.service";
 import { ScanService } from "@/features/scans/scan.service";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { StatusPill } from "@/components/ui/status-pill";
-import { Flame, ShieldCheck, FileText, Beaker } from "lucide-react";
+import { ShieldCheck, FileText, Beaker } from "lucide-react";
 import { ProductGrade } from "@/components/analysis/product-grade";
 import { GradeExplanation } from "@/components/analysis/grade-explanation";
 import { notFound } from "next/navigation";
@@ -10,6 +10,7 @@ import { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { TrackProductView } from "@/components/sections/recent-products";
+import { ProductImage } from "@/components/products/product-image";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -48,7 +49,7 @@ export default async function ScanResultPage({ params }: PageProps) {
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-12 md:px-8 md:py-16">
-      <TrackProductView productId={product.id} name={product.name} brand={product.brand?.name ?? "Unknown brand"} />
+      <TrackProductView productId={product.id} name={product.name} brand={product.brand?.name ?? "Unknown brand"} imageUrl={product.imageUrl} />
       <Link href="/scan" className="mb-8 inline-flex items-center gap-2 text-sm text-foreground-muted hover:text-foreground">
         <ChevronLeft className="size-4" />
         Back to search or scan another label
@@ -58,8 +59,8 @@ export default async function ScanResultPage({ params }: PageProps) {
         {/* Left Column: Product Info & Score */}
         <div className="space-y-6 md:col-span-1">
           <div className="rounded-2xl bg-surface p-6 shadow-[var(--shadow-card)] border border-border">
-            <div className="mb-6 flex items-center justify-center rounded-xl bg-primary/5 py-8">
-              <Flame className="size-16 text-primary/40" strokeWidth={1} />
+            <div className="mb-6">
+              <ProductImage src={product.imageUrl} alt={`${product.name} product packaging`} className="mx-auto w-full max-w-64" sizes="(max-width: 768px) 90vw, 280px" />
             </div>
 
             <h1 className="text-2xl font-semibold text-foreground">{product.name}</h1>
@@ -68,6 +69,7 @@ export default async function ScanResultPage({ params }: PageProps) {
               <p className="mb-6 text-xs text-foreground-muted">{product.category.name}</p>
             )}
             <p className="mb-5 text-xs text-foreground-muted">Product data: {product.verificationStatus.toLowerCase().replaceAll("_", " ")}</p>
+            {product.imageUrl && product.sourceRecords.some((record) => record.source.key === "open_food_facts") && <p className="mb-4 text-xs text-foreground-muted">Product image: Open Food Facts community contribution · image licensing may differ from the database license.</p>}
             {product.sourceRecords.length > 0 && <div className="mb-5 text-xs text-foreground-muted">
               <p className="font-medium">Source information</p>
               {product.sourceRecords.map((record) => <a key={record.id} href={record.sourceUrl} target="_blank" rel="noreferrer" className="mt-1 block text-primary hover:underline">{record.source.name} · retrieved {new Date(record.retrievedAt).toLocaleDateString()}</a>)}

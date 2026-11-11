@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { ProductSummary, ProductWithDetails } from "./product.types";
+import type { ProductSearchRecord, ProductSummary, ProductWithDetails } from "./product.types";
 
 const productDetails = {
   brand: true,
@@ -15,7 +15,7 @@ export class ProductRepository {
     return prisma.product.findUnique({ where: { id }, include: productDetails });
   }
 
-  static search(query: string): Promise<ProductSummary[]> {
+  static search(query: string, limit = 10): Promise<ProductSearchRecord[]> {
     const searchTerm = query.trim();
     if (!searchTerm) return Promise.resolve([]);
     return prisma.product.findMany({
@@ -26,8 +26,8 @@ export class ProductRepository {
           { category: { is: { name: { contains: searchTerm, mode: "insensitive" } } } },
         ],
       },
-      include: { brand: true, category: true },
-      take: 20,
+      include: { brand: true, category: true, identifiers: { where: { scheme: "GTIN" }, select: { value: true } } },
+      take: limit,
       orderBy: { name: "asc" },
     });
   }

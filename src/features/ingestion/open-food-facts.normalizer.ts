@@ -1,4 +1,5 @@
 import { OpenFoodFactsProductSchema, type NormalizedFoodProduct, type NormalizedIngredient, type NormalizedNutrition, type OpenFoodFactsProduct } from "./open-food-facts.types";
+import { selectOpenFoodFactsFrontImage } from "./open-food-facts-image";
 
 function toFiniteNumber(value: unknown): number | null {
   if (typeof value !== "number" && typeof value !== "string") return null;
@@ -131,7 +132,8 @@ export function normalizeOpenFoodFactsProduct(input: unknown, requestedBarcode: 
     ...(!product.allergens && !product.allergens_tags?.length ? ["allergens"] : []),
   ];
   return {
-    externalId: product.code || requestedBarcode, name, brandName, packageSize: product.quantity?.trim() || null, categoryName, imageUrl: product.image_url || null,
+    externalId: product.code || requestedBarcode, name, brandName, packageSize: product.quantity?.trim() || null, categoryName,
+    imageUrl: selectOpenFoodFactsFrontImage(product as Record<string, unknown>),
     ingredients, ingredientsText, allergensText: product.allergens?.trim() || product.allergens_tags?.join(", ") || null,
     allergenNames: [...new Set((product.allergens_tags ?? []).map((tag) => tag.split(":").at(-1)?.replace(/-/g, " ").trim().toLocaleLowerCase("en-US")).filter((name): name is string => Boolean(name)))],
     additivesCodes: [...new Set((product.additives_tags ?? []).map((tag) => tag.match(/(?:^|:)e(\d{3,4}[a-z]?)(?:$|\b)/i)?.[1]?.toUpperCase()).filter((code): code is string => Boolean(code)))],

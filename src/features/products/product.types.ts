@@ -12,3 +12,10 @@ export type ProductWithDetails = Prisma.ProductGetPayload<{
 }>;
 
 export type ProductSummary = Prisma.ProductGetPayload<{ include: { brand: true; category: true } }>;
+export type ProductSearchRecord = Prisma.ProductGetPayload<{
+  include: {
+    brand: true;
+    category: true;
+    identifiers: { where: { scheme: "GTIN" }; select: { value: true } };
+  };
+}>;

@@ -74,7 +74,7 @@ export class ProductIngestionRepository {
             data: {
               ...(brand ? { brandId: brand.id } : {}),
               ...(category ? { categoryId: category.id } : {}),
-              ...(!product.imageUrl && normalized.imageUrl ? { imageUrl: normalized.imageUrl } : {}),
+              ...(normalized.imageUrl && normalized.imageUrl !== product.imageUrl ? { imageUrl: normalized.imageUrl } : {}),
               ...(!product.packageSize && normalized.packageSize ? { packageSize: normalized.packageSize } : {}),
               ...(!product.allergensText && normalized.allergensText ? { allergensText: normalized.allergensText } : {}),
               missingFields: normalized.missingFields,
