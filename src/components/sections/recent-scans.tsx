@@ -2,19 +2,37 @@
 
 import { useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ShieldCheck, AlertTriangle } from "lucide-react";
 import { fadeUp, staggerContainer, viewportOnce } from "@/lib/animations";
+import { StatusPill } from "@/components/ui/status-pill";
 import Link from "next/link";
-import { ProductGrade } from "@/components/analysis/product-grade";
 
 // The Scan data structure expected by the UI
 export interface RecentScanItem {
   id: string;
-  productId: string | null;
   name: string;
   brand: string;
+  grade: "A" | "B" | "C" | "D" | "Unknown";
+  score: number;
+  status: "safe" | "caution" | "flag" | "unknown";
+  statusText: string;
   scannedAgo: string;
 }
+
+const gradeColors: Record<string, string> = {
+  A: "text-safe bg-safe-bg",
+  B: "text-safe bg-safe-bg",
+  C: "text-caution bg-caution-bg",
+  D: "text-flag bg-flag-bg",
+  Unknown: "text-unknown bg-unknown-bg",
+};
+
+const statusIcons: Record<string, typeof ShieldCheck> = {
+  safe: ShieldCheck,
+  caution: AlertTriangle,
+  flag: AlertTriangle,
+  unknown: ShieldCheck,
+};
 
 interface RecentScansProps {
   scans: RecentScanItem[];
@@ -43,8 +61,6 @@ export function RecentScans({ scans }: RecentScansProps) {
     // Debounced check
     setTimeout(checkScroll, 350);
   };
-
-  if (scans.length === 0) return null;
 
   return (
     <section className="bg-background py-24 md:py-28 lg:py-32">
@@ -111,15 +127,20 @@ export function RecentScans({ scans }: RecentScansProps) {
             className="scrollbar-hide -mx-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 md:-mx-0 md:gap-5 md:px-0"
           >
             {scans.map((scan) => {
+              const Icon = statusIcons[scan.status] ?? ShieldCheck;
               return (
                 <Link
                   href={`/scan/${scan.id}`}
                   key={scan.id}
                   className="block w-[280px] shrink-0 snap-start rounded-2xl border border-border bg-surface p-5 shadow-[var(--shadow-card)] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-[var(--shadow-elevated)] sm:w-[300px]"
                 >
-                  {/* Persisted grade + time */}
+                  {/* Header: grade badge + time */}
                   <div className="mb-4 flex items-center justify-between">
-                    {scan.productId ? <ProductGrade productId={scan.productId} compact /> : <span className="text-xs text-foreground-muted">No linked product</span>}
+                    <span
+                      className={`inline-flex size-9 items-center justify-center rounded-lg text-sm font-bold ${gradeColors[scan.grade]}`}
+                    >
+                      {scan.grade}
+                    </span>
                     <span className="text-xs text-foreground-muted">
                       {scan.scannedAgo}
                     </span>
@@ -133,7 +154,27 @@ export function RecentScans({ scans }: RecentScansProps) {
                     {scan.brand}
                   </p>
 
-                  <p className="text-xs text-foreground-muted">Nutrition profile assessment</p>
+                  {/* Score bar */}
+                  <div className="mb-3">
+                    <div className="mb-1 flex justify-between text-xs text-foreground-muted">
+                      <span>Score</span>
+                      <span>{scan.score}/100</span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-border">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-flag via-caution to-safe"
+                        style={{ width: `${scan.score}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Status pill */}
+                  <StatusPill
+                    variant={scan.status}
+                    icon={<Icon className="size-3.5" strokeWidth={1.75} />}
+                  >
+                    {scan.statusText}
+                  </StatusPill>
                 </Link>
               );
             })}
