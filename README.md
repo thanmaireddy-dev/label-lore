@@ -34,7 +34,7 @@ Label Reader is a web application that helps Indian consumers understand food pr
 
 The one-time SQLite transfer script uses Node's built-in `node:sqlite` and requires Node.js >= 22.5.
 
-A PostgreSQL database is required for the current Prisma schema. The previous local SQLite database is retained at `prisma/dev.db`; its data is not automatically transferred.
+A PostgreSQL database is required for the current Prisma schema. `prisma/dev.db` and its verified backup are retained unchanged. Their data was transferred once into the persistent PostgreSQL volume; normal startup does not re-import SQLite data.
 
 ---
 
@@ -50,41 +50,50 @@ npm install
 
 ## Environment Setup
 
-Copy the example for Docker Compose and the application. Prisma CLI reads `.env`; Next.js reads `.env.local` (and `.env`):
+For a new checkout, copy the example for Docker Compose and the application. Prisma CLI reads `.env`; Next.js reads `.env.local` (then `.env`):
 
 ```bash
 cp .env.example .env
 cp .env.example .env.local
 ```
 
-The example includes local-only PostgreSQL credentials. Change `POSTGRES_PASSWORD` and make its password match in `DATABASE_URL` in both env files. Keep `.env` and `.env.local` private.
+The example includes local-only placeholder credentials. Set `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, and `POSTGRES_PORT` in `.env`; set the matching PostgreSQL `DATABASE_URL` in both `.env` and `.env.local`. Keep `.env` and `.env.local` private. `.gitignore` excludes both local files.
 
 ## Local PostgreSQL Setup
 
-Start PostgreSQL with persistent Docker volume storage:
+### Windows quick start (PowerShell)
+
+1. Install and open Docker Desktop. Wait until it reports that Docker is running.
+2. Open PowerShell in the project directory (`C:\label-reader`).
+3. Install dependencies if `node_modules` is not present, and start the existing PostgreSQL service:
 
 ```bash
-docker compose up -d postgres
+npm install
+docker compose up -d
+docker compose ps
 ```
 
-Apply the PostgreSQL baseline and transfer the preserved demo database before starting the app:
+Wait until `postgres` shows `healthy`. The named volume retains the existing data between stops. For this already-migrated project, do not rerun the legacy SQLite transfer. For a new/empty PostgreSQL volume only, prepare the schema and optionally seed sample data:
 
 ```bash
 npx prisma generate
 npx prisma migrate deploy
-# If the legacy SQLite database and its backup are present:
-npm run db:migrate:legacy
 npx prisma migrate status
+# Optional only for an empty database when demo sample products are wanted:
+npx prisma db seed
+```
+
+Start the application and open <http://localhost:3000>:
+
+```bash
 npm run dev
 ```
 
-On a clean checkout without the local legacy SQLite file and backup, use `npx prisma db seed` instead of the transfer command to load the six sample products.
-
-Check database readiness with `docker compose ps`. Use `docker compose down` to stop the container; the named volume remains. `docker compose down -v` deletes the local PostgreSQL data volume and should only be used when you intentionally want to remove this database.
+To stop the app, press `Ctrl+C` in its terminal. To stop PostgreSQL while preserving the container and named data volume, run `docker compose stop postgres`. `docker compose down` also preserves named volumes. Never add `-v` when stopping the database.
 
 ---
 
-The SQLite transfer script verifies the backup hash, reads `prisma/dev.db` read-only, preserves existing IDs and relationships, and uses non-overwriting upserts so it can be rerun. It maps old category text into `food.Category` and old ingredient INS codes into `food.Additive`. It requires Node 22.5+ for built-in `node:sqlite`. The original database and ignored backup remain unchanged. The current migration and transfer results are documented in `PROJECT_STATUS.md`.
+The one-time SQLite transfer script verifies the backup hash, reads `prisma/dev.db` read-only, preserves IDs and relationships, and requires Node 22.5+ for built-in `node:sqlite`. It has already been run for this local database. Do not rerun it as part of normal startup. The original database and ignored backup remain unchanged; the migrated PostgreSQL data lives in the Docker named volume. Migration results are documented in `PROJECT_STATUS.md`.
 
 ---
 
@@ -104,7 +113,7 @@ Opening a product adds it to Recent products in this browser. `/history`, the ho
 
 ## Reliability status
 
-The development command uses Next.js 16's documented `--webpack` option because the default Turbopack dev server hit a Windows junction-point error in this environment. A successful Open Food Facts refresh invalidates persisted product grades and their saved explanations transactionally; subsequent reads recalculate from the latest stored inputs. Prompt 11 adds hybrid catalogue discovery and product image display using the existing product image field. Current Prompt 11 checks: 61 automated tests, Prisma validation and migration status, TypeScript, ESLint, production build, and `git diff --check`; live Haldiram search/import, persistence, repeat lookup, local-first deduplication, and the Next route handler were verified. Browser click-through and remote image retrieval from the browser were blocked by this environment's localhost/socket restrictions. See [PROJECT_STATUS.md](PROJECT_STATUS.md) for the verification record and limitations.
+The development command uses Next.js 16's documented `--webpack` option because the default Turbopack dev server hit a Windows junction-point error in this environment. Prompt 12 restarted the existing PostgreSQL container and preserved named volume after finding the service stopped. It is healthy with five migrations applied. Database checks found eight products and all 24 foreign keys validated. All 61 tests, TypeScript, ESLint, Prisma validation/generation/status, production build, and `git diff --check` pass. The runtime used for verification could not reach `localhost:3000` from Chrome or reach Open Food Facts, so browser click-through and current live discovery/import are not claimed. OpenAI is unconfigured and no representative OCR photo fixture is present. See [PROJECT_STATUS.md](PROJECT_STATUS.md) for the complete results.
 
 ---
 
